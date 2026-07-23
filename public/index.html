@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Plane Design — Trade Catalog</title>
+<link rel="icon" type="image/png" href="/ppd-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<style>
+  :root{ --ink:#211d17; --paper:#faf8f4; --card:#fff; --line:#e7e1d6; --brass:#a9822f;
+    --brass-soft:#f3ead6; --muted:#8a8175; }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:'Manrope',sans-serif;background:var(--paper);color:var(--ink);font-size:15px;line-height:1.5}
+  .screen{display:none;min-height:100vh;padding-bottom:60px}
+  .screen.active{display:block}
+  header{background:var(--ink);color:#f5efe2;padding:14px 18px;position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:12px}
+  header .back{font-size:22px;background:none;border:none;color:#f5efe2;padding:2px 6px 2px 0;cursor:pointer;display:none}
+  header .back.show{display:block}
+  .brand{font-family:'Marcellus',serif;font-size:17px;letter-spacing:.14em;text-transform:uppercase}
+  .brand small{display:block;font-family:'Manrope',sans-serif;font-size:10px;letter-spacing:.32em;color:var(--brass);margin-top:2px}
+  header .spacer{flex:1}
+  .updated{font-size:10px;letter-spacing:.12em;color:rgba(245,239,226,.6)}
+  .hero{padding:26px 20px 20px;border-bottom:1px solid var(--line)}
+  .hero h1{font-family:'Marcellus',serif;font-size:25px;font-weight:400;line-height:1.25}
+  .hero p{color:var(--muted);margin-top:8px;font-size:13.5px;max-width:36ch}
+  .ptype-list{padding:18px 16px}
+  .ptype-card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;margin-bottom:14px;cursor:pointer;display:flex;align-items:center;gap:14px}
+  .ptype-card:active{background:var(--brass-soft)}
+  .ptype-card .pt-name{font-family:'Marcellus',serif;font-size:21px;font-weight:400}
+  .ptype-card .pt-sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .ptype-card .chev{margin-left:auto;color:var(--brass);font-size:22px}
+  .toolbar{position:sticky;top:58px;z-index:40;background:var(--paper);border-bottom:1px solid var(--line);
+    padding:12px 16px;display:flex;gap:10px;align-items:center}
+  .searchbox{display:flex;align-items:center;gap:8px;background:var(--card);border:1.5px solid var(--line);
+    border-radius:8px;padding:10px 14px;flex:1;min-width:0}
+  .searchbox input{border:none;outline:none;font-family:'Manrope',sans-serif;font-size:15px;flex:1;min-width:0;background:none;color:var(--ink)}
+  .searchbox .icon{color:var(--brass);font-size:16px}
+  .searchbox .clear{color:var(--muted);font-size:18px;cursor:pointer;display:none;background:none;border:none;padding:0 2px}
+  .tb-btn{flex-shrink:0;display:flex;align-items:center;gap:7px;background:var(--card);border:1.5px solid var(--line);
+    border-radius:8px;padding:10px 14px;font-family:'Manrope',sans-serif;font-weight:700;font-size:13px;color:var(--ink);cursor:pointer;position:relative}
+  .tb-btn .badge{position:absolute;top:-7px;right:-7px;background:var(--brass);color:#fff;font-size:10px;font-weight:700;
+    border-radius:100px;padding:2px 6px;display:none}
+  .tb-btn .badge.show{display:block}
+  .coll-block{margin-top:22px}
+  .coll-header{display:flex;align-items:baseline;gap:10px;padding:0 20px 4px}
+  .coll-header h3{font-family:'Marcellus',serif;font-size:20px;font-weight:400}
+  .coll-header .cnt{font-size:12px;color:var(--muted)}
+  .ratio-label{display:flex;align-items:center;gap:10px;padding:8px 20px 10px}
+  .ratio-label .rl-line{flex:1;height:1px;background:var(--line)}
+  .ratio-label span{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:700;white-space:nowrap}
+  .grid{display:grid;gap:14px;padding:0 16px}
+  .grid.landscape{grid-template-columns:1fr}
+  .grid.portrait,.grid.square{grid-template-columns:1fr 1fr}
+  @media(min-width:700px){
+    .grid.landscape{grid-template-columns:1fr 1fr}
+    .grid.portrait,.grid.square{grid-template-columns:repeat(3,1fr)}
+  }
+  .tile{position:relative}
+  .tile img{width:100%;display:block;border-radius:5px;box-shadow:0 1px 3px rgba(33,29,23,.07);background:#eee;cursor:pointer}
+  .sku-onimg{position:absolute;right:7px;font-size:11px;font-weight:700;letter-spacing:.05em;pointer-events:none;font-family:'Manrope',sans-serif}
+  /* full-screen design viewer */
+  #vw{position:fixed;inset:0;background:rgba(15,13,10,.94);z-index:120;display:none;align-items:center;justify-content:center}
+  #vw.show{display:flex}
+  #vw img{max-width:92vw;max-height:82vh;border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+  #vw .vw-sku{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);background:var(--ink);color:#e8d9b0;
+    font-size:14px;font-weight:700;letter-spacing:.08em;border-radius:4px;padding:6px 14px}
+  #vw .vw-x{position:absolute;top:14px;right:14px;width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;
+    background:rgba(255,255,255,.12);color:#fff;font-size:22px;line-height:1}
+  #vw .vw-nav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:64px;border:none;cursor:pointer;
+    background:rgba(255,255,255,.10);color:#fff;font-size:30px;border-radius:8px}
+  #vw .vw-prev{left:8px} #vw .vw-next{right:8px}
+  #vw .vw-nav:disabled{opacity:.25;cursor:default}
+  /* scroll to top */
+  #topBtn{position:fixed;right:16px;bottom:20px;width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;
+    background:var(--ink);color:#e8d9b0;font-size:20px;z-index:60;display:none;box-shadow:0 3px 12px rgba(33,29,23,.3)}
+  #topBtn.show{display:block}
+  /* loading shimmer */
+  .shim-wrap{padding:24px 16px}
+  .shim{background:linear-gradient(90deg,#eee8dc 25%,#f6f1e7 50%,#eee8dc 75%);background-size:200% 100%;
+    animation:shm 1.2s infinite;border-radius:8px;margin-bottom:14px}
+  @keyframes shm{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  .tb-btn svg{width:15px;height:15px;flex-shrink:0}
+  .sku-plate{margin-top:6px;display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.08em;
+    background:var(--ink);color:#e8d9b0;border-radius:3px;padding:3px 9px}
+  .empty,.loading{padding:60px 20px;text-align:center;color:var(--muted)}
+  .veil{position:fixed;inset:0;background:rgba(20,17,12,.55);z-index:70;display:none}
+  .veil.show{display:block}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:80;background:var(--card);border-radius:14px 14px 0 0;
+    max-height:78vh;overflow:auto;transform:translateY(105%);transition:transform .25s ease;padding-bottom:24px}
+  .sheet.show{transform:translateY(0)}
+  .sheet .grip{width:40px;height:4px;border-radius:2px;background:var(--line);margin:10px auto 0}
+  .sheet h3{font-family:'Marcellus',serif;font-size:19px;font-weight:400;padding:14px 20px 2px}
+  .sheet .sub{font-size:12.5px;color:var(--muted);padding:0 20px 10px}
+  .sheet .quick{display:flex;gap:10px;padding:4px 20px 12px}
+  .sheet .quick button{background:none;border:1px solid var(--line);border-radius:100px;padding:7px 15px;
+    font-family:'Manrope',sans-serif;font-weight:600;font-size:12.5px;color:var(--muted);cursor:pointer}
+  .f-group{display:flex;align-items:center;gap:10px;padding:10px 20px 6px;font-size:10.5px;letter-spacing:.24em;
+    text-transform:uppercase;color:var(--brass);font-weight:700;cursor:pointer;user-select:none}
+  .f-group .arr{width:14px;transition:transform .15s;display:inline-block}
+  .f-group.closed .arr{transform:rotate(-90deg)}
+  .f-group .gnm{flex:1}
+  .f-group .gcount{font-size:10px;letter-spacing:0;color:var(--muted);text-transform:none;font-weight:400}
+  .f-group .gbox{width:18px;height:18px;border:1.6px solid var(--brass);border-radius:4px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;line-height:1}
+  .f-group .gbox.all{background:var(--brass)}
+  .f-group .gbox.some{background:var(--brass);opacity:.45}
+  .f-item{display:flex;align-items:center;gap:12px;padding:11px 20px;border-top:1px solid var(--line);cursor:pointer}
+  .f-item .box{width:20px;height:20px;border:1.8px solid var(--line);border-radius:4px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px}
+  .f-item.on .box{background:var(--ink);border-color:var(--ink)}
+  .f-item .nm{flex:1}
+  .f-item .n{font-size:12px;color:var(--muted)}
+  .apply-bar{position:sticky;bottom:0;background:var(--card);padding:12px 20px;border-top:1px solid var(--line)}
+  .apply-bar button{width:100%;background:var(--ink);color:#f0e6cf;border:none;border-radius:6px;padding:14px;
+    font-family:'Manrope',sans-serif;font-weight:700;font-size:14px;letter-spacing:.05em;cursor:pointer}
+  .p-item{display:flex;align-items:center;gap:12px;padding:13px 20px;border-top:1px solid var(--line);cursor:pointer}
+  .p-item .nm{flex:1;font-weight:600}
+  .p-item .dl{color:var(--brass);font-weight:700;font-size:13px;white-space:nowrap}
+
+  /* ---- customer gate ---- */
+  #custGate{position:fixed;inset:0;background:var(--paper);z-index:200;display:none;overflow-y:auto}
+  #custGate.show{display:block}
+  .cg-wrap{max-width:400px;margin:0 auto;padding:44px 22px 60px}
+  .cg-brand{font-family:'Marcellus',serif;font-size:20px;letter-spacing:.14em;text-transform:uppercase;text-align:center}
+  .cg-brand small{display:block;font-family:'Manrope',sans-serif;font-size:10px;letter-spacing:.32em;color:var(--brass);margin-top:4px}
+  .cg-note{text-align:center;color:var(--muted);font-size:13px;margin:14px 0 24px;line-height:1.55}
+  .cg-tabs{display:flex;border:1.5px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:20px}
+  .cg-tabs button{flex:1;padding:11px;border:none;background:var(--card);font-family:'Manrope',sans-serif;font-weight:600;font-size:14px;color:var(--muted);cursor:pointer}
+  .cg-tabs button.on{background:var(--ink);color:#f5efe2}
+  .cg-field{margin-bottom:12px}
+  .cg-field label{display:block;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;font-weight:600}
+  .cg-field input{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:8px;font-family:'Manrope',sans-serif;font-size:15px;background:var(--card);color:var(--ink)}
+  .cg-field input:focus{outline:none;border-color:var(--brass)}
+  .cg-err{color:#a03123;font-size:13.5px;margin:6px 0 0;min-height:18px;font-weight:600}
+  .cg-btn{width:100%;padding:13px;margin-top:14px;border:none;border-radius:8px;background:var(--brass);color:#fff;font-family:'Manrope',sans-serif;font-weight:700;font-size:15px;letter-spacing:.04em;cursor:pointer}
+  .cg-btn:disabled{opacity:.6}
+  .cg-foot{text-align:center;font-size:12px;color:var(--muted);margin-top:22px;line-height:1.6}
+</style>
+</head>
+<body>
+<div id="custGate">
+  <div class="cg-wrap">
+    <img src="/ppd-logo.png" alt="Paper Plane Design" style="display:block;width:150px;margin:0 auto 10px">
+    <div class="cg-brand" style="font-size:13px">Trade Design Catalog<small>By Invitation of Paper Plane Design</small></div>
+    <p class="cg-note">Our complete design catalog is reserved for trade partners.<br>Register once for instant free access.</p>
+    <div class="cg-tabs">
+      <button id="cgTabReg" class="on" onclick="cgTab('reg')">Register</button>
+      <button id="cgTabLog" onclick="cgTab('log')">Login</button>
+    </div>
+    <div id="cgReg">
+      <div class="cg-field"><label>Your Name</label><input id="rgName" autocomplete="name"></div>
+      <div class="cg-field"><label>Company / Shop Name</label><input id="rgCompany" autocomplete="organization"></div>
+      <div class="cg-field"><label>Phone (WhatsApp)</label><input id="rgPhone" type="tel" autocomplete="tel"></div>
+      <div class="cg-field"><label>Email</label><input id="rgEmail" type="email" autocomplete="email"></div>
+      <div class="cg-field"><label>Set a Password</label><input id="rgPass" type="password" autocomplete="new-password"></div>
+      <div class="cg-field"><label>Confirm Password</label><input id="rgPass2" type="password" autocomplete="new-password"></div>
+      <div class="cg-err" id="rgErr"></div>
+      <button class="cg-btn" id="rgBtn" onclick="cgRegister()">Enter Catalog</button>
+    </div>
+    <div id="cgLog" style="display:none">
+      <div class="cg-field"><label>Email or Phone</label><input id="lgEmail" autocomplete="username"></div>
+      <div class="cg-field"><label>Password</label><input id="lgPass" type="password" autocomplete="current-password"></div>
+      <div class="cg-err" id="lgErr"></div>
+      <button class="cg-btn" id="lgBtn" onclick="cgLogin()">Login</button>
+    </div>
+    <p class="cg-foot">Your details stay private and are used only to serve you better.<br><br>
+    All designs in this catalog are original creations and the intellectual property of Paper Plane Design.
+    We're delighted to have you browse and order — we only ask that designs are not copied, reproduced,
+    or used commercially without our written permission.</p>
+  </div>
+</div>
+
+<header>
+  <button class="back" id="backBtn" onclick="goHome()">‹</button>
+  <img src="/ppd-logo.png" alt="Paper Plane Design" style="height:34px;background:#faf8f4;border-radius:6px;padding:3px 6px">
+  <div class="brand">Paper Plane Design<small>Trade Design Catalog</small></div>
+  <div class="spacer"></div>
+  <div class="updated" id="updatedTag"></div>
+</header>
+
+<div class="screen active" id="homeScreen">
+  <div class="hero">
+    <h1>Browse the designs.<br>Order the ones you love.</h1>
+    <p>Pick a printing type below and browse the designs. When you like a design, send us its design code (written under the picture) or simply a screenshot on WhatsApp — our team will take care of the rest, including sizes and pricing.</p>
+  </div>
+  <div class="ptype-list" id="ptypeList"><div class="shim-wrap">
+   <div class="shim" style="height:76px"></div><div class="shim" style="height:76px"></div>
+   <div class="shim" style="height:76px"></div><div class="shim" style="height:76px"></div>
+   <div class="shim" style="height:76px"></div></div></div>
+  <div id="loggedBar" style="display:none;padding:6px 20px 26px;text-align:center;font-size:12.5px;color:var(--muted)">
+    You are logged in as <b id="loggedName" style="color:var(--ink)"></b> &nbsp;·&nbsp;
+    <button onclick="cgLogout()" style="background:none;border:none;color:var(--brass);font-family:'Manrope',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;text-decoration:underline;padding:0">Logout</button>
+  </div>
+</div>
+
+<div class="screen" id="typeScreen">
+  <div class="toolbar">
+    <div class="searchbox">
+      <span class="icon">⌕</span>
+      <input id="searchInput" type="text" placeholder="Search designs…" oninput="applyState()">
+      <button class="clear" id="clearBtn" onclick="clearSearch()">×</button>
+    </div>
+    <button class="tb-btn" onclick="openTools('filterSheet')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Collections<span class="badge" id="filterBadge"></span></button>
+    <button class="tb-btn" id="viewOrderBtn" onclick="toggleViewOrder()" title="Change design order"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 5v14M8 19l-3-3M8 19l3-3M16 19V5M16 5l-3 3M16 5l3 3"/></svg><span id="sortLbl">Sort: SKU</span></button>
+    <button class="tb-btn" onclick="openTools('pdfSheet')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M12 15l-4-4M12 15l4-4M5 21h14"/></svg>Download PDF</button>
+  </div>
+  <div id="feed"></div>
+</div>
+
+<div class="veil" id="veil" onclick="closeSheets()"></div>
+<div id="vw" onclick="if(event.target===this)vwClose()">
+  <button class="vw-x" onclick="vwClose()" aria-label="Close">×</button>
+  <button class="vw-nav vw-prev" id="vwPrev" onclick="vwStep(-1)" aria-label="Previous">‹</button>
+  <img id="vwImg" alt="">
+  <button class="vw-nav vw-next" id="vwNext" onclick="vwStep(1)" aria-label="Next">›</button>
+  <div class="vw-sku" id="vwSku"></div>
+</div>
+<button id="topBtn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Back to top">↑</button>
+<div class="sheet" id="filterSheet">
+  <div class="grip"></div>
+  <h3>Choose collections to view</h3>
+  <div class="sub">Tick the collections you want to see. All are shown by default.</div>
+  <div class="quick">
+    <button onclick="selectAll(true)">Select all</button>
+    <button onclick="selectAll(false)">Clear all</button>
+  </div>
+  <input type="text" id="fSearch" placeholder="Find a collection… e.g. phoenix"
+    style="margin:6px 20px 4px;padding:9px 12px;width:calc(100% - 40px);box-sizing:border-box;border:1px solid var(--line);border-radius:8px;font:inherit"
+    oninput="renderFilterList()" autocomplete="off">
+  <div id="filterList"></div>
+  <div class="apply-bar"><button onclick="closeSheets()">Show designs</button></div>
+</div>
+<div class="sheet" id="pdfSheet">
+  <div class="grip"></div>
+  <h3>Download catalog PDF</h3>
+  <div class="sub">Each PDF contains the complete, current catalog of that collection — dated on every page.</div>
+  <div style="display:flex;gap:18px;align-items:center;margin:10px 0 6px;font-size:13px">
+    <span style="color:var(--muted)">Order:</span>
+    <label style="cursor:pointer"><input type="radio" name="pdfOrder" value="sku" checked> By SKU</label>
+    <label style="cursor:pointer"><input type="radio" name="pdfOrder" value="color"> By colour theme</label>
+  </div>
+  <div id="pdfList"></div>
+</div>
+
+<script>
+/* ================= customer access gate ================= */
+function cgTab(which){
+  document.getElementById('cgReg').style.display = which==='reg' ? 'block':'none';
+  document.getElementById('cgLog').style.display = which==='log' ? 'block':'none';
+  document.getElementById('cgTabReg').classList.toggle('on', which==='reg');
+  document.getElementById('cgTabLog').classList.toggle('on', which==='log');
+}
+function cgShow(){ document.getElementById('custGate').classList.add('show'); }
+function cgHide(){ document.getElementById('custGate').classList.remove('show'); }
+async function cgCheck(){
+  try{ const r = await fetch('/api/cust');
+    if(r.ok){
+      const d = await r.json().catch(()=>({}));
+      if(d.name){
+        document.getElementById('loggedName').textContent = d.name;
+        document.getElementById('loggedBar').style.display = 'block';
+      }
+      cgHide(); return true;
+    }
+  }catch(e){}
+  cgShow(); return false;
+}
+async function cgLogout(){
+  if(!confirm('Logout from the catalog on this device?')) return;
+  try{ await fetch('/api/cust',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'logout'})}); }catch(e){}
+  location.reload();
+}
+async function cgRegister(){
+  const err = document.getElementById('rgErr'); err.textContent='';
+  const name=document.getElementById('rgName').value.trim(),
+        company=document.getElementById('rgCompany').value.trim(),
+        phone=document.getElementById('rgPhone').value.trim(),
+        email=document.getElementById('rgEmail').value.trim(),
+        pw=document.getElementById('rgPass').value,
+        pw2=document.getElementById('rgPass2').value;
+  if(!name||!company||!phone||!email||!pw||!pw2){ err.textContent='Please fill all fields.'; return; }
+  if(pw !== pw2){ err.textContent='The two passwords do not match. Please type the same password in both boxes.'; return; }
+  const btn=document.getElementById('rgBtn'); btn.disabled=true;
+  try{
+    const r = await fetch('/api/cust',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'register',name,company,phone,email,password:pw})});
+    const d = await r.json();
+    if(r.ok){ cgHide(); location.reload(); }
+    else err.textContent = d.error || 'Something went wrong. Please try again.';
+  }catch(e){ err.textContent='Network problem. Please check internet and try again.'; }
+  btn.disabled=false;
+}
+async function cgLogin(){
+  const err = document.getElementById('lgErr'); err.textContent='';
+  const email=document.getElementById('lgEmail').value.trim(),
+        pw=document.getElementById('lgPass').value;
+  if(!email||!pw){ err.textContent='Please enter email and password.'; return; }
+  const btn=document.getElementById('lgBtn'); btn.disabled=true;
+  try{
+    const r = await fetch('/api/cust',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'login',email,password:pw})});
+    const d = await r.json();
+    if(r.ok){ cgHide(); location.reload(); }
+    else err.textContent = d.error || 'Login failed. Please try again.';
+  }catch(e){ err.textContent='Network problem. Please check internet and try again.'; }
+  btn.disabled=false;
+}
+</script>
+<script>
+const PTYPES = [
+  ["IJ","Inkjet Prints","Fine art paper & poster prints"],
+  ["CV","Canvas Printing","Classic printed canvas"],
+  ["TX","Texture Canvas Printing","Hand-feel textured canvas"],
+  ["3D","3D Wall Art","Sculpted relief wall pieces"],
+  ["LT","Leather Paintings","Premium art on leather"]
+];
+const FLAT = { "3D":"ART", LT:"LTH" };  // flat print types: one series, no collections
+const STRUCTURE = [
+ ["Master Categories",[["MODN", "Modern Art"], ["ABST", "Abstract Art"], ["OFFC", "Office Art"], ["BOHO", "Boho"], ["BLKW", "Black & White"], ["FLRL", "Floral"], ["HRSE", "Horses"], ["CITY", "City & Landscapes"], ["TRVL", "Travel"], ["ASTR", "Astronomy & Space"], ["MUSC", "Music"], ["KTCH", "Kitchen / Food"], ["KIDS", "Kids Room"], ["BABY", "Baby / Cute Kids"], ["MOTV", "Motivational"], ["WMEN", "Women"], ["CUPL", "Couple"], ["EURO", "European Vintage"], ["PATR", "Patriotic / Freedom Fighters"], ["FMPT", "Famous Paintings"], ["MNDL", "Mandala"], ["AMRC", "America"]]],
+ ["Nature",[["NATR", "Nature – General"], ["CSTL", "Coastal & Beach"], ["MNTN", "Mountains"], ["FRST", "Forests & Trees"], ["SESN", "Seasons"], ["CHRY", "Cherry Blossom / Japanese"], ["TRPC", "Tropical & Palms"], ["BTNC", "Botanical"]]],
+ ["Wildlife",[["WILD", "Wildlife – General"], ["LNTG", "Lions & Tigers"], ["ELPH", "Elephants"], ["DEER", "Deer & Stag"], ["SEAL", "Sea Life"], ["BIRD", "Birds"]]],
+ ["Automobile",[["AUTO", "Automobile – General"], ["BIKE", "Bikes & Motorcycles"], ["CARS", "Cars"]]],
+ ["Sports",[["GYMF", "Gym & Fitness"], ["FTBL", "Football"], ["CRKT", "Cricket"], ["FRML", "Formula 1"], ["GOLF", "Golf"], ["BSBL", "Baseball"], ["BSKT", "Basketball"], ["BOXG", "Boxing"], ["MMAF", "MMA"]]],
+ ["Pop Culture",[["POPM", "Pop Art / Maximalist"], ["GRFT", "Graffiti & Street Art"], ["HUMR", "Humor & Quirky"], ["SRRL", "Surreal"]]],
+ ["Healthcare",[["MTRN", "Maternity Clinic"], ["DNTL", "Dental"], ["HART", "Heart"], ["HLTH", "Healthcare General"]]],
+ ["Vastu & Feng Shui",[["VHRS", "Seven Running Horses"], ["VWTR", "Waterfall"], ["VPHX", "Phoenix"], ["VLTS", "Lotus"], ["VKOI", "Koi Fish"], ["VBUD", "Buddha (Vastu)"], ["VTRE", "Tree of Life"], ["VPCK", "Peacock"], ["VGEN", "General Vastu"], ["VSUN", "Sunrise"], ["VYNT", "Shri Yantra"]]],
+ ["Traditional",[["PICH", "Pichwai"], ["SHNJ", "Shreenath Ji"], ["MDHB", "Madhubani"], ["KERM", "Kerala Mural"], ["MUGL", "Mughal Ethnic"], ["BNRS", "Banaras Ghat"], ["KLGT", "Kalighat"], ["WRLI", "Warli"], ["GOND", "Gond"], ["PTCH", "Pattachitra"], ["KLMK", "Kalamkari"], ["TNJR", "Tanjore Style"], ["PHAD", "Phad"], ["RJPM", "Rajput / Pahari Miniature"], ["MYSR", "Mysore Painting"], ["CHRL", "Cheriyal Scroll"], ["DOOR", "Rajasthani Doors & Jharokha"], ["DANC", "Indian Classical Dance"]]],
+ ["Religious",[["KRSN", "Krishna"], ["RDKR", "Radha Krishna"], ["BLKR", "Bal Krishna"], ["RDHA", "Radha"], ["SHIV", "Shiva"], ["SHPV", "Shiv Parivar"], ["GNSH", "Ganesha"], ["LKSM", "Lakshmi"], ["LKGN", "Lakshmi Ganesh"], ["LGST", "Lakshmi Ganesh Saraswati"], ["SRSW", "Saraswati"], ["RAMA", "Ram / Ram Lala"], ["RMDB", "Ram Darbar"], ["STRM", "Sita Ram"], ["HNMN", "Hanuman"], ["DRGA", "Durga / Devi"], ["KALI", "Kali"], ["SNTM", "Santoshi Maa"], ["VSNU", "Vishnu / Vishnu Lakshmi"], ["GNGA", "Ganga Maiya"], ["SHNI", "Shani Dev"], ["NVGR", "Navgraha"], ["VSWK", "Vishwakarma"], ["SAIB", "Sai Baba"], ["KTSY", "Khatu Shyam"], ["JHLL", "Jhulelal"], ["NKRB", "Neem Karoli Baba"], ["SWMN", "Swaminarayan"], ["TRPB", "Tirupati Balaji"], ["MRGN", "Murugan"], ["AYPA", "Ayyappa"], ["MNKS", "Meenakshi"], ["VSHD", "Vaishno Devi"], ["BUDH", "Buddha"], ["MHVR", "Mahavir / Jain"], ["SIKH", "Sikhism"], ["JSMM", "Jesus / Mother Mary"], ["ISLM", "Islamic Calligraphy"], ["AMBK", "Ambedkar"], ["SPRT", "Spiritual General"], ["MHBT", "Mahabharata"], ["GLDT", "Golden Temple"], ["JGNT", "Jagannath"], ["RMND", "Ram Mandir Ayodhya"], ["NTRJ", "Nataraja"], ["OMSY", "Om & Sacred Symbols"], ["SHLK", "Sanskrit / Shloka Calligraphy"], ["GITA", "Gita Updesh"], ["KEDR", "Kedarnath / Char Dham"], ["ASHT", "Ashtalakshmi"], ["DSHV", "Dashavatar"], ["GRNK", "Guru Nanak / Sikh Gurus"], ["SURY", "Surya Dev"], ["MECC", "Mecca & Madina"]]],
+ ["India States",[["PNJB", "Punjab"], ["RJST", "Rajasthan"], ["HRYA", "Haryana"], ["ODIS", "Odisha"], ["ASSM", "Assam"], ["HMPR", "Himachal Pradesh"], ["UTRK", "Uttarakhand"], ["UTPR", "Uttar Pradesh"], ["MDPR", "Madhya Pradesh"], ["MHRA", "Maharashtra"], ["GUJR", "Gujarat"], ["GOAA", "Goa"], ["KERL", "Kerala"], ["TMND", "Tamil Nadu"], ["KRNT", "Karnataka"], ["ANPR", "Andhra Pradesh"], ["TLNG", "Telangana"], ["WBNG", "West Bengal"], ["BIHR", "Bihar"], ["JHKD", "Jharkhand"], ["CHTG", "Chhattisgarh"], ["SIKM", "Sikkim"], ["ARNC", "Arunachal Pradesh"], ["NGLD", "Nagaland"], ["MNPR", "Manipur"], ["MZRM", "Mizoram"], ["TRPR", "Tripura"], ["MGHL", "Meghalaya"], ["DLHI", "Delhi"], ["JMKS", "Jammu & Kashmir"], ["LDKH", "Ladakh"], ["PDCH", "Puducherry"], ["ANDM", "Andaman & Nicobar"]]],
+ ["Hotel Destinations",[["JAIP", "Jaipur"], ["UDAI", "Udaipur"], ["JODH", "Jodhpur"], ["JSLM", "Jaisalmer"], ["AGRA", "Agra"], ["VRNS", "Varanasi"], ["AMRT", "Amritsar"], ["RSHK", "Rishikesh–Haridwar"], ["SHML", "Shimla"], ["MNLI", "Manali"], ["MSRE", "Dehradun–Mussoorie"], ["NNTL", "Nainital"], ["LEHL", "Leh–Ladakh"], ["DRJL", "Darjeeling"], ["GNTK", "Gangtok"], ["SHLG", "Shillong"], ["KZRG", "Guwahati–Kaziranga"], ["PURI", "Puri"], ["GOAH", "Goa"], ["MUMB", "Mumbai"], ["PUNE", "Pune"], ["MTAB", "Mount Abu"], ["BHUJ", "Rann of Kutch–Bhuj"], ["KOCH", "Kochi"], ["MNNR", "Munnar"], ["OOTY", "Ooty"], ["MYSU", "Mysuru"], ["CORG", "Coorg"], ["CRBT", "Jim Corbett"], ["RNTH", "Ranthambore"], ["DELH", "Delhi"], ["BLRU", "Bengaluru"]]]
+];
+/* Search tags — will be updated with Amit's final Excel */
+const TAGS = {
+ MODN:"modern,contemporary",
+ ABST:"abstract,texture,colours,colorful",
+ OFFC:"office,corporate,reception,cabin,urban,architecture,building",
+ BOHO:"boho,bohemian,aesthetic,beige,neutral",
+ BLKW:"black and white,black white,bw,monochrome,charcoal",
+ POPM:"pop,maximalist,funky,colorful,quirky",
+ NATR:"nature,scenery,landscape,mountain,forest,sunrise,sunset,greenery",
+ WILD:"wildlife,animal,animals,tiger,lion,elephant,deer,jungle,giraffe,leopard",
+ BIRD:"birds,bird,flamingo,parrot,sparrow,crane",
+ FLRL:"floral,flower,flowers,rose,botanical,leaf,leaves",
+ HRSE:"horse,horses,ghoda,stallion,abstract horse,modern horse",
+ CITY:"city,cityscape,skyline,new york,paris,london,street",
+ TRVL:"travel,world,map,adventure,vintage travel",
+ ASTR:"space,astronomy,moon,planets,galaxy,stars,astronaut",
+ AUTO:"car,cars,bike,vintage car,automobile,racing",
+ MUSC:"music,guitar,piano,musician,instruments",
+ KTCH:"kitchen,food,cafe,coffee,dining,restaurant,spices",
+ KIDS:"kids,kids room,children,cartoon,nursery",
+ BABY:"baby,cute baby,baby poster,infant",
+ MOTV:"motivational,motivation,quotes,inspiration,success,gym",
+ WMEN:"woman,women,lady,girl,african,afro,portrait,feminine",
+ CUPL:"couple,romantic,love,pair,wedding",
+ EURO:"european,vintage,classic,victorian,renaissance",
+ PATR:"patriotic,india,flag,tiranga,freedom fighters,bhagat singh,subhash chandra bose,netaji,gandhi,army",
+ FMPT:"famous,van gogh,starry night,monet,picasso,mona lisa,raja ravi varma,classic",
+ VHRS:"seven horses,7 horses,seven running horses,saat ghode,running horses,vastu horses,lucky horses,horse,horses",
+ VWTR:"waterfall,vastu waterfall,flowing water,jharna,nature",
+ VPHX:"phoenix,feng shui bird,lucky bird",
+ VLTS:"lotus,kamal,lotus flower,pink lotus",
+ VKOI:"koi,koi fish,fish,nine fish,lucky fish,feng shui fish",
+ VBUD:"buddha vastu,feng shui buddha,laughing buddha,buddha",
+ VTRE:"tree of life,prosperity tree,money tree,golden tree",
+ VPCK:"peacock,mor,feathers",
+ VGEN:"vastu,feng shui,lucky,positive energy,evil eye,pyramid",
+ PICH:"pichwai,pichhwai,cow,kamdhenu,lotus pichwai",
+ SHNJ:"shreenathji,shreenath ji,srinathji,nathdwara",
+ MDHB:"madhubani,mithila,folk",
+ KERM:"kerala mural,mural,south indian",
+ MUGL:"mughal,ethnic,miniature,rajasthani,royal",
+ BNRS:"banaras,varanasi,ghat,kashi",
+ KLGT:"kalighat,bengal,folk",
+ KRSN:"krishna,kanha,kanhaiya,murlidhar,shri krishna,flute",
+ RDKR:"radha krishna,radha,radhe krishna,radhe radhe,krishna",
+ BLKR:"bal krishna,laddu gopal,baby krishna,bal gopal,makhan chor,krishna",
+ RDHA:"radha,radha rani,radhe",
+ SHIV:"shiva,shiv,mahadev,bholenath,shankar,trishul,adiyogi,mahakal",
+ SHPV:"shiv parivar,shiva family,shiv parvati,shiv parvati ganesh,shiva",
+ GNSH:"ganesha,ganesh,ganpati,vinayak,bappa,ganesh ji",
+ LKSM:"lakshmi,laxmi,mahalakshmi,lakshmi mata",
+ LKGN:"lakshmi ganesh,laxmi ganesh,diwali",
+ LGST:"lakshmi ganesh saraswati,laxmi ganesh saraswati,diwali trio,diwali",
+ SRSW:"saraswati,sharda,saraswati mata,veena",
+ RAMA:"ram,shri ram,ram lala,ayodhya,jai shri ram",
+ RMDB:"ram darbar,ram parivar,ram",
+ STRM:"sita ram,siya ram,ram",
+ HNMN:"hanuman,bajrangbali,hanuman ji,pawanputra,sankat mochan",
+ DRGA:"durga,devi,sherawali,mata rani,ambe,navratri",
+ KALI:"kali,maa kali,mahakali",
+ SNTM:"santoshi,santoshi maa,santoshi mata",
+ VSNU:"vishnu,narayan,vishnu lakshmi,laxmi narayan",
+ GNGA:"ganga,ganga maiya,ganga mata",
+ SHNI:"shani,shani dev,shanidev",
+ NVGR:"navgraha,nine planets,graha",
+ VSWK:"vishwakarma,vishwakarma ji,factory god",
+ SAIB:"sai baba,sai,shirdi,om sai ram",
+ KTSY:"khatu shyam,shyam baba,khatushyam,hare ka sahara",
+ JHLL:"jhulelal,jhule lal,sindhi",
+ NKRB:"neem karoli,neem karoli baba,kainchi dham",
+ SWMN:"swaminarayan,akshardham",
+ TRPB:"tirupati,balaji,venkateswara,tirupati balaji",
+ MRGN:"murugan,kartikeya,subramanya",
+ AYPA:"ayyappa,sabarimala,ayyappan",
+ MNKS:"meenakshi,madurai",
+ VSHD:"vaishno devi,mata vaishno",
+ BUDH:"buddha,gautam buddha,meditation,zen,peaceful",
+ MHVR:"mahavir,jain,mahaveer,tirthankar",
+ SIKH:"guru nanak,golden temple,gurudwara,sikh,ik onkar,khanda,waheguru,guru gobind singh",
+ JSMM:"jesus,christ,mother mary,christian,cross,last supper",
+ ISLM:"islamic,calligraphy,allah,arabic,mecca,madina,ayatul kursi",
+ AMBK:"ambedkar,babasaheb,buddha dhamma",
+ SPRT:"spiritual,om,mantra,temple,mandir,gayatri,swastik,shubh labh",
+ PNJB:"punjab,punjabi,phulkari,bhangra",
+ RJST:"rajasthan,rajasthani,jaipur,udaipur,jaisalmer,desert,camel",
+ HRYA:"haryana,haryanvi",
+ ODIS:"odisha,orissa,pattachitra,jagannath puri",
+ ASSM:"assam,assamese,tea garden,bihu",
+ HMPR:"himachal,shimla,manali,mountains,himachal pradesh",
+ UTRK:"uttarakhand,mussoorie,nainital,kedarnath,haridwar",
+ UTPR:"uttar pradesh,up,lucknow,taj mahal,agra",
+ MDPR:"madhya pradesh,mp,gond,khajuraho",
+ MHRA:"maharashtra,marathi,mumbai,warli",
+ GUJR:"gujarat,gujarati,rann,garba",
+ GOAA:"goa,beach,portuguese",
+ KERL:"kerala,backwaters,kathakali,houseboat",
+ TMND:"tamil nadu,tamil,tanjore,madurai,chennai",
+ KRNT:"karnataka,mysore,hampi,bangalore",
+ ANPR:"andhra pradesh,andhra,kalamkari",
+ TLNG:"telangana,hyderabad,charminar",
+ WBNG:"west bengal,bengali,kolkata,durga puja",
+ BIHR:"bihar,madhubani bihar,patna",
+ JHKD:"jharkhand,sohrai",
+ CHTG:"chhattisgarh,bastar",
+ SIKM:"sikkim,gangtok,monastery",
+ ARNC:"arunachal,tawang,arunachal pradesh",
+ NGLD:"nagaland,hornbill",
+ MNPR:"manipur",
+ MZRM:"mizoram",
+ TRPR:"tripura",
+ MGHL:"meghalaya,shillong,living root bridge",
+ DLHI:"delhi,india gate,red fort,qutub",
+ JMKS:"kashmir,jammu,srinagar,dal lake,houseboat,gulmarg,jammu & kashmir",
+ LDKH:"ladakh,leh,pangong,monastery",
+ PDCH:"puducherry,pondicherry,french colony",
+ ANDM:"andaman,nicobar,islands,beach,andaman & nicobar",
+ MNDL:"mandala,sacred geometry,meditation",
+ CSTL:"coastal,beach,sea,shore,waves,ocean side",
+ MNTN:"mountains,peaks,himalaya,snow,hills",
+ FRST:"forest,trees,woods,jungle,greenery",
+ SESN:"seasons,autumn,spring,winter,monsoon,fall",
+ CHRY:"cherry blossom,sakura,japanese,japan",
+ TRPC:"tropical,palm,palms,leaves,summer",
+ BTNC:"botanical,leaf,monstera,fern,plants,green",
+ LNTG:"lion,tiger,big cat,cheetah,leopard,panther",
+ ELPH:"elephant,elephants,tusker",
+ DEER:"deer,stag,antlers,reindeer",
+ SEAL:"sea life,whale,dolphin,fish,underwater,ocean,coral,turtle",
+ BIKE:"bike,motorcycle,bullet,harley,rider",
+ CARS:"car,cars,sports car,vintage car,supercar",
+ GYMF:"gym,fitness,workout,bodybuilding,exercise",
+ FTBL:"football,soccer,messi style,goal",
+ CRKT:"cricket,batsman,bowler,stadium",
+ GRFT:"graffiti,street art,urban,spray,banksy style",
+ HUMR:"humor,funny,quirky,meme,comic",
+ VSUN:"sunrise,rising sun,morning,east,vastu sunrise",
+ WRLI:"warli,tribal,folk",
+ GOND:"gond,tribal art,folk",
+ PTCH:"pattachitra,odisha art,folk",
+ KLMK:"kalamkari,andhra art,folk",
+ TNJR:"tanjore,thanjavur,gold foil",
+ PHAD:"phad,rajasthani folk,scroll",
+ RJPM:"miniature,rajput,pahari,mughal miniature",
+ MYSR:"mysore painting,karnataka art",
+ CHRL:"cheriyal,telangana scroll",
+ DOOR:"door,jharokha,rajasthani door,haveli,window",
+ DANC:"dance,bharatanatyam,kathak,kathakali,odissi,classical dance",
+ MHBT:"mahabharata,gita,geeta updesh,krishna arjun,chariot,kurukshetra",
+ GLDT:"golden temple,harmandir sahib,amritsar",
+ JGNT:"jagannath,puri,rath yatra",
+ RMND:"ram mandir,ayodhya,ram temple",
+ AMRC:"america,american,usa,route 66,new york,statue of liberty,wild west",
+ FRML:"formula 1,f1,racing,race car,grand prix",
+ GOLF:"golf,golfer,golf course,putting",
+ BSBL:"baseball,batter,pitcher,stadium",
+ BSKT:"basketball,hoop,dunk,court,nba style",
+ BOXG:"boxing,boxer,gloves,ring,fight",
+ MMAF:"mma,martial arts,fighter,octagon,kickboxing",
+ SRRL:"surreal,surrealism,dreamlike,dali style,fantasy",
+ MTRN:"maternity,mother,baby clinic,pregnancy,newborn,gynecology",
+ DNTL:"dental,dentist,teeth,tooth,smile,clinic",
+ HART:"heart,cardiology,cardiac,heartbeat,pulse",
+ HLTH:"healthcare,hospital,doctor,medical,clinic,wellness,anatomy",
+ JAIP:"jaipur,hawa mahal,pink city,amber fort",
+ UDAI:"udaipur,lake palace,city of lakes,pichola",
+ JODH:"jodhpur,blue city,mehrangarh",
+ JSLM:"jaisalmer,golden fort,desert,camel,sand dunes",
+ AGRA:"agra,taj mahal",
+ VRNS:"varanasi,kashi,banaras,ghats,ganga aarti",
+ AMRT:"amritsar,golden temple,punjab city",
+ RSHK:"rishikesh,haridwar,ganga,laxman jhula,yoga",
+ SHML:"shimla,ridge,himachal hills",
+ MNLI:"manali,solang,snow mountains himachal",
+ MSRE:"mussoorie,dehradun,queen of hills",
+ NNTL:"nainital,naini lake,kumaon",
+ LEHL:"leh,ladakh,pangong,monastery,himalaya",
+ DRJL:"darjeeling,toy train,kanchenjunga,tea garden",
+ GNTK:"gangtok,sikkim,rumtek",
+ SHLG:"shillong,meghalaya,cherrapunji,living root bridge",
+ KZRG:"guwahati,kaziranga,assam,rhino,kamakhya",
+ PURI:"puri,jagannath temple,odisha beach,konark",
+ GOAH:"goa,beach,church,portuguese,palm",
+ MUMB:"mumbai,gateway of india,marine drive,bombay",
+ PUNE:"pune,lonavala,mahabaleshwar,shaniwar wada",
+ MTAB:"mount abu,dilwara,nakki lake",
+ BHUJ:"kutch,rann,bhuj,white desert,gujarat craft",
+ KOCH:"kochi,chinese fishing nets,fort kochi,kerala backwaters",
+ MNNR:"munnar,tea plantation,kerala hills",
+ OOTY:"ooty,nilgiri,toy train,tea estate",
+ MYSU:"mysuru,mysore palace,chamundi",
+ CORG:"coorg,madikeri,coffee plantation",
+ CRBT:"jim corbett,tiger safari,ramnagar,jungle",
+ RNTH:"ranthambore,tiger,fort,safari",
+ DELH:"delhi,india gate,red fort,qutub minar,lotus temple",
+ BLRU:"bengaluru,bangalore,vidhana soudha,lalbagh,garden city",
+ VYNT:"shri yantra,sri yantra,yantra,sacred geometry vastu",
+ NTRJ:"nataraja,dancing shiva,cosmic dance,tandava",
+ OMSY:"om,aum,swastik,trishul,ik onkar,sacred symbols",
+ SHLK:"sanskrit,shloka,mantra,gayatri,calligraphy,mrityunjaya",
+ GITA:"gita updesh,geeta,krishna arjun,chariot,kurukshetra updesh",
+ KEDR:"kedarnath,char dham,badrinath,gangotri,yamunotri",
+ ASHT:"ashtalakshmi,eight lakshmi,ashta lakshmi",
+ DSHV:"dashavatar,ten avatars,vishnu avatars,matsya,kurma,varaha,narasimha,vamana,parashuram",
+ GRNK:"guru nanak,sikh gurus,guru gobind singh,ten gurus",
+ SURY:"surya,sun god,surya dev,aditya",
+ MECC:"mecca,madina,kaaba,masjid nabawi,haram",
+ ART:"3d,relief,sculpture,textured,wall decor",
+ LTH:"leather,leather painting,premium leather art"
+};
+const BUCKET_NAMES = {1:"Landscape · 2:3",2:"Landscape · 3:4",3:"Landscape · 1:2 Panoramic",
+  4:"Portrait · 2:3",5:"Portrait · 3:4",6:"Portrait · 1:2",7:"Square · 1:1",8:"Special"};
+const GRID_CLASS = {1:'landscape',2:'landscape',3:'landscape',4:'portrait',5:'portrait',6:'portrait',7:'square',8:'landscape'};
+const NAME_BY_CODE = {ART:"3D Wall Art", LTH:"Leather Paintings"}, GROUP_BY_CODE = {ART:"3D Wall Art", LTH:"Leather Paintings"};
+STRUCTURE.forEach(([g,items])=>items.forEach(([c,n])=>{NAME_BY_CODE[c]=n;GROUP_BY_CODE[c]=g;}));
+const PT_NAME = Object.fromEntries(PTYPES.map(p=>[p[0],p[1]]));
+
+let designs = [], byType = {}, currentType = null, selected = new Set();
+let viewOrder='sku';
+const collapsedGroups=new Set();
+function toggleViewOrder(){
+  viewOrder = viewOrder==='sku' ? 'color' : 'sku';
+  document.getElementById('sortLbl').textContent = viewOrder==='sku' ? 'Sort: SKU' : 'Sort: Colour';
+  applyState();
+}
+
+async function boot(){
+  try{
+    const ok = await cgCheck(); if(!ok) return;
+    const res = await fetch('/api/catalog');
+    if(res.status===401){ cgShow(); return; }
+    const data = await res.json();
+    designs = data.designs || [];
+    document.getElementById('updatedTag').textContent = 'Updated ' + (data.updated||'');
+    byType = {};
+    designs.forEach(d=>{
+      byType[d.ptype] = byType[d.ptype] || {};
+      (byType[d.ptype][d.code] = byType[d.ptype][d.code] || []).push(d);
+    });
+    renderHome();
+  }catch(e){
+    document.getElementById('ptypeList').innerHTML = '<div class="empty">Could not load the catalog. Check your connection and refresh.</div>';
+  }
+}
+function collsOf(pt){
+  const m = byType[pt]||{};
+  const out = [];
+  if(FLAT[pt]){ if((m[FLAT[pt]]||[]).length) out.push(FLAT[pt]); return out; }
+  STRUCTURE.forEach(([g,items])=>items.forEach(([code])=>{ if((m[code]||[]).length) out.push(code); }));
+  return out;
+}
+function renderHome(){
+  const root = document.getElementById('ptypeList');
+  root.innerHTML = '';
+  PTYPES.forEach(([pt,name,sub])=>{
+    const n = Object.values(byType[pt]||{}).reduce((s,a)=>s+a.length,0);
+    const card = document.createElement('div');
+    card.className = 'ptype-card';
+    card.onclick = ()=>openType(pt);
+    card.innerHTML = `<div><div class="pt-name">${name}</div>
+      <div class="pt-sub">${sub}${n?` · ${n} design${n>1?'s':''}`:''}</div></div><span class="chev">›</span>`;
+    root.appendChild(card);
+  });
+}
+function openType(pt){
+  currentType = pt;
+  selected = new Set(collsOf(pt));   // all on by default
+  document.getElementById('searchInput').value='';
+  document.getElementById('homeScreen').classList.remove('active');
+  document.getElementById('typeScreen').classList.add('active');
+  document.getElementById('backBtn').classList.add('show');
+  renderFilterList(); renderPdfList(); applyState(); window.scrollTo(0,0);
+}
+function goHome(){
+  closeSheets();
+  document.getElementById('typeScreen').classList.remove('active');
+  document.getElementById('homeScreen').classList.add('active');
+  document.getElementById('backBtn').classList.remove('show');
+  window.scrollTo(0,0);
+}
+function openTools(id){
+  document.getElementById('veil').classList.add('show');
+  document.getElementById(id).classList.add('show');
+}
+function closeSheets(){
+  document.getElementById('veil').classList.remove('show');
+  document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('show'));
+}
+function renderFilterList(){
+  const root = document.getElementById('filterList');
+  root.innerHTML='';
+  const codes = collsOf(currentType);
+  const q = (document.getElementById('fSearch').value||'').trim().toLowerCase();
+  // group codes preserving order
+  const groups=[]; const seen={};
+  codes.forEach(code=>{
+    const g = FLAT[currentType] ? '' : GROUP_BY_CODE[code];
+    if(!(g in seen)){ seen[g]=groups.length; groups.push({name:g, codes:[]}); }
+    groups[seen[g]].codes.push(code);
+  });
+  groups.forEach(gr=>{
+    const visible = q ? gr.codes.filter(c=>NAME_BY_CODE[c].toLowerCase().includes(q)) : gr.codes;
+    if(!visible.length) return;
+    const selCount = gr.codes.filter(c=>selected.has(c)).length;
+    const isClosed = !q && collapsedGroups.has(currentType+'|'+gr.name);
+    if(gr.name){
+      const g=document.createElement('div');
+      g.className='f-group'+(isClosed?' closed':'');
+      const st = selCount===gr.codes.length ? 'all' : selCount>0 ? 'some' : '';
+      g.innerHTML=`<span class="arr">▾</span><span class="gnm">${gr.name}</span>
+        <span class="gcount">${gr.codes.length} collections</span>
+        <span class="gbox ${st}">${st?'✓':''}</span>`;
+      g.querySelector('.gbox').onclick=(e)=>{
+        e.stopPropagation();
+        const allOn = selCount===gr.codes.length;
+        gr.codes.forEach(c=>{ if(allOn) selected.delete(c); else selected.add(c); });
+        renderFilterList(); applyState();
+      };
+      g.onclick=()=>{
+        const k=currentType+'|'+gr.name;
+        if(collapsedGroups.has(k)) collapsedGroups.delete(k); else collapsedGroups.add(k);
+        renderFilterList();
+      };
+      root.appendChild(g);
+    }
+    if(isClosed) return;
+    visible.forEach(code=>{
+      const n = (byType[currentType][code]||[]).length;
+      const it=document.createElement('div');
+      it.className='f-item'+(selected.has(code)?' on':'');
+      it.innerHTML=`<div class="box">✓</div><span class="nm">${NAME_BY_CODE[code]}</span><span class="n">${n}</span>`;
+      it.onclick=()=>{
+        if(selected.has(code)) selected.delete(code); else selected.add(code);
+        renderFilterList(); applyState();
+      };
+      root.appendChild(it);
+    });
+  });
+  const total = codes.length;
+  const badge=document.getElementById('filterBadge');
+  if(selected.size===total || selected.size===0) badge.classList.remove('show');
+  else { badge.textContent=selected.size; badge.classList.add('show'); }
+}
+function selectAll(on){
+  selected = on ? new Set(collsOf(currentType)) : new Set();
+  renderFilterList(); applyState();
+}
+function renderPdfList(){
+  const root=document.getElementById('pdfList');
+  root.innerHTML='';
+  collsOf(currentType).forEach(code=>{
+    const n = (byType[currentType][code]||[]).length;
+    const it=document.createElement('div');
+    it.className='p-item';
+    it.innerHTML=`<span class="nm">${NAME_BY_CODE[code]}</span>
+      <span style="color:var(--muted);font-size:12px">${n} designs</span><span class="dl" id="pdl-${code}">Download</span>`;
+    it.onclick=()=>downloadPdf(code);
+    root.appendChild(it);
+  });
+}
+function clearSearch(){ document.getElementById('searchInput').value=''; applyState(); }
+function applyState(){
+  const q=document.getElementById('searchInput').value.trim().toLowerCase();
+  document.getElementById('clearBtn').style.display=q?'block':'none';
+  const feed=document.getElementById('feed');
+  feed.innerHTML=''; VIEWLIST=[];
+  let shown=0;
+  collsOf(currentType).forEach(code=>{
+    const name = NAME_BY_CODE[code];
+    const tags = TAGS[code]||'';
+    const tagHit = !q || tags.toLowerCase().includes(q) || name.toLowerCase().includes(q);
+    const visible = q ? tagHit : selected.has(code);
+    if(!visible) return;
+    shown++;
+    const recs = byType[currentType][code].slice().sort(
+      viewOrder==='color'
+        ? (a,b)=>((a.ck==null)-(b.ck==null)) || (a.ck-b.ck) || a.sku.localeCompare(b.sku)
+        : (a,b)=>a.sku.localeCompare(b.sku));
+    const block=document.createElement('div');
+    block.className='coll-block';
+    block.innerHTML=`<div class="coll-header"><h3>${name}</h3><span class="cnt">${recs.length} designs</span></div>`;
+    for(let b=1;b<=8;b++){
+      const items=recs.filter(r=>r.bucket===b);
+      if(!items.length) continue;
+      const lbl=document.createElement('div');
+      lbl.className='ratio-label';
+      lbl.innerHTML=`<span>${BUCKET_NAMES[b]}</span><div class="rl-line"></div>`;
+      block.appendChild(lbl);
+      const grid=document.createElement('div');
+      grid.className='grid '+GRID_CLASS[b];
+      items.forEach(r=>{
+        const t=document.createElement('div');
+        t.className='tile';
+        t.innerHTML=`<img loading="lazy" src="/api/image/${r.sku}.jpg" alt="${r.sku}" style="aspect-ratio:${r.w}/${r.h}">
+          <span class="sku-onimg">${r.sku}</span>
+          <span class="sku-plate">${r.sku}</span>`;
+        const im=t.querySelector('img'), tag=t.querySelector('.sku-onimg');
+        im.addEventListener('load',()=>skuInkFor(im,tag),{once:true});
+        const idx=VIEWLIST.length; VIEWLIST.push(r.sku);
+        im.onclick=()=>vwOpen(idx);
+        grid.appendChild(t);
+      });
+      block.appendChild(grid);
+    }
+    feed.appendChild(block);
+  });
+  if(!shown) feed.innerHTML='<div class="empty">No designs match. Try a different word, or open Filters and Select all.</div>';
+}
+
+/* clean per-collection PDF, dated */
+
+/* ===== Compact layout engine: landscape 2/page stacked, portrait & square 4/page (2x2), panoramic 3/page — all centered as a block ===== */
+const RLBL={1:"Landscape · 2:3",2:"Landscape · 3:4",3:"Landscape · 1:2 Panoramic",4:"Portrait · 2:3",5:"Portrait · 3:4",6:"Portrait · 1:2",7:"Square · 1:1",8:"Special"};
+
+/* dominant-colour analysis: histogram of saturated pixels -> strongest hue family wins; neutrals grouped last by lightness */
+function _hueKeyFromImg(im){
+  try{
+    const N=48;
+    const c=document.createElement('canvas'); c.width=c.height=N;
+    const x=c.getContext('2d'); x.drawImage(im,0,0,N,N);
+    const d=x.getImageData(0,0,N,N).data;
+    const bins=new Array(12).fill(0), binL=new Array(12).fill(0);
+    let chrom=0, tot=0, sumL=0;
+    for(let i=0;i<d.length;i+=4){
+      const R=d[i]/255,G=d[i+1]/255,B=d[i+2]/255;
+      const mx=Math.max(R,G,B),mn=Math.min(R,G,B),l=(mx+mn)/2,df=mx-mn;
+      tot++; sumL+=l;
+      if(df<0.0001) continue;
+      const s=df/(1-Math.abs(2*l-1));
+      if(s<=0.2||l<=0.12||l>=0.9) continue;          // ignore washed-out & near-black pixels
+      let h; if(mx===R)h=((G-B)/df+6)%6; else if(mx===G)h=(B-R)/df+2; else h=(R-G)/df+4;
+      const bin=Math.floor(h*60/30)%12;
+      bins[bin]+=s; binL[bin]+=l*s; chrom++;
+    }
+    if(chrom < tot*0.12) return 100000+Math.round((sumL/tot)*100);   // genuinely neutral artwork
+    let best=0; for(let k=1;k<12;k++) if(bins[k]>bins[best]) best=k;
+    const L=binL[best]/bins[best];
+    return best*1000+Math.round(L*100);
+  }catch(e){ return 999999; }
+}
+function colorKey(dataURL){
+  return new Promise(res=>{
+    const im=new Image();
+    im.onload=()=>res(_hueKeyFromImg(im));
+    im.onerror=()=>res(999999);
+    im.src=dataURL;
+  });
+}
+async function pdfPrepImage(sku){
+  const r=await fetch(`/api/image/${sku}.jpg`);
+  const blob=await r.blob();
+  const url=URL.createObjectURL(blob);
+  try{
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;});
+    const scale=Math.min(1, 700/Math.max(img.naturalWidth,img.naturalHeight));
+    const w=Math.round(img.naturalWidth*scale), h=Math.round(img.naturalHeight*scale);
+    const c=document.createElement('canvas'); c.width=w; c.height=h;
+    const x=c.getContext('2d'); x.drawImage(img,0,0,w,h);
+    // sample bottom-right corner luminance -> pick readable ink
+    let ink='#111';
+    try{
+      const d=x.getImageData(Math.round(w*0.72),Math.round(h*0.88),Math.max(1,Math.round(w*0.26)),Math.max(1,Math.round(h*0.10))).data;
+      let lum=0,n=0; for(let i=0;i<d.length;i+=16){ lum+=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; n++; }
+      if(n && (lum/n)<128) ink='#fff';
+    }catch(e){}
+    const fs=Math.max(11, Math.round(w*0.028));
+    x.font='700 '+fs+'px Arial'; x.textAlign='right'; x.textBaseline='bottom'; x.fillStyle=ink;
+    x.fillText(sku, w-Math.round(fs*0.6), h-Math.round(fs*0.45));
+    return c.toDataURL('image/jpeg',0.82);
+  } finally { URL.revokeObjectURL(url); }
+}
+async function buildCatalogPdf(recs, titleLine, imgFn, progress, sortMode){
+  const { jsPDF } = window.jspdf;
+  const pdf=new jsPDF({unit:'pt',format:'a4'});
+  const PW=595,PH=842,M=42,GAP=24,CAP=24,SP=22,RG=16;
+  const HEAD_BOT=M+76, FOOT_TOP=PH-46, contentH=FOOT_TOP-HEAD_BOT;
+  const today=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  let pageNo=0;
+  function newPage(label){
+    if(pageNo>0) pdf.addPage();
+    pageNo++;
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(15);
+    pdf.text('DESIGN CATALOG', M, M+6);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(130);
+    pdf.text('Updated as on '+today, PW-M, M+6, {align:'right'});
+    pdf.setDrawColor(205); pdf.line(M, M+16, PW-M, M+16);
+    pdf.setTextColor(0);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(11.5);
+    pdf.text(titleLine, PW/2, M+40, {align:'center'});
+    pdf.setFontSize(8); pdf.setTextColor(169,130,47);
+    pdf.text(label.toUpperCase(), PW/2, M+58, {align:'center'});
+    pdf.setTextColor(0);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(150);
+    pdf.text('Page '+pageNo, PW/2, PH-24, {align:'center'});
+    pdf.setTextColor(0);
+  }
+  function drawOne(img,w,h,x,y,sku){
+    pdf.addImage(img,'JPEG',x,y,w,h);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9);
+    pdf.text(sku, x+w/2, y+h+15, {align:'center'});
+  }
+  let done=0, total=recs.length*(sortMode==='color'?2:1);
+  if(sortMode==='color'){
+    const cache={};
+    for(const r of recs){
+      cache[r.sku]=await imgFn(r.sku);
+      r._ck=await colorKey(cache[r.sku]);
+      progress(++done,total);
+    }
+    recs=recs.slice().sort((a,b)=>(a._ck-b._ck)||a.sku.localeCompare(b.sku));
+    imgFn=async sku=>cache[sku];
+  }
+  async function stackPages(items,label,perPage){
+    for(let i=0;i<items.length;i+=perPage){
+      newPage(label);
+      const grp=items.slice(i,i+perPage);
+      const maxEach=(contentH-grp.length*CAP-(grp.length-1)*SP-6)/grp.length;
+      const sizes=grp.map(r=>{const ratio=r.w/r.h;let w=PW-2*M,h=w/ratio;if(h>maxEach){h=maxEach;w=h*ratio;}return{w,h};});
+      const blockH=sizes.reduce((s,z)=>s+z.h+CAP,0)+(grp.length-1)*SP;
+      let y=HEAD_BOT+(contentH-blockH)/2;
+      for(let k=0;k<grp.length;k++){
+        drawOne(await imgFn(grp[k].sku),sizes[k].w,sizes[k].h,(PW-sizes[k].w)/2,y,grp[k].sku);
+        y+=sizes[k].h+CAP+SP;
+        progress(++done,total);
+      }
+    }
+  }
+  async function gridPages(items,label){
+    const slotW=(PW-2*M-GAP)/2;
+    for(let i=0;i<items.length;i+=4){
+      newPage(label);
+      const grp=items.slice(i,i+4);
+      const rows=[grp.slice(0,2),grp.slice(2,4)].filter(r=>r.length);
+      const maxRowH=(contentH-rows.length*CAP-(rows.length-1)*RG-6)/rows.length;
+      const rowData=rows.map(row=>{
+        const sizes=row.map(r=>{const ratio=r.w/r.h;let w=slotW,h=w/ratio;if(h>maxRowH){h=maxRowH;w=h*ratio;}return{w,h};});
+        return {row,sizes,h:Math.max(...sizes.map(z=>z.h))};
+      });
+      const blockH=rowData.reduce((s,rd)=>s+rd.h+CAP,0)+(rowData.length-1)*RG;
+      let y=HEAD_BOT+(contentH-blockH)/2;
+      for(const rd of rowData){
+        if(rd.row.length===1){
+          const z=rd.sizes[0];
+          drawOne(await imgFn(rd.row[0].sku),z.w,z.h,(PW-z.w)/2,y+(rd.h-z.h)/2,rd.row[0].sku);
+          progress(++done,total);
+        } else {
+          const cx=[M+slotW/2, M+slotW+GAP+slotW/2];
+          for(let k=0;k<2;k++){
+            const z=rd.sizes[k];
+            drawOne(await imgFn(rd.row[k].sku),z.w,z.h,cx[k]-z.w/2,y+(rd.h-z.h)/2,rd.row[k].sku);
+            progress(++done,total);
+          }
+        }
+        y+=rd.h+CAP+RG;
+      }
+    }
+  }
+  const groups={};
+  recs.forEach(r=>{(groups[r.bucket]=groups[r.bucket]||[]).push(r);});
+  for(const b of [1,2,3,4,5,6,7,8]){
+    const items=groups[b]; if(!items||!items.length) continue;
+    const label=RLBL[b]||'Designs';
+    if(b===1||b===2||b===8) await stackPages(items,label,2);
+    else if(b===3) await stackPages(items,label,3);
+    else await gridPages(items,label);
+  }
+  return pdf;
+}
+
+async function downloadPdf(code){
+  const link=document.getElementById('pdl-'+code);
+  const orig=link.textContent;
+  try{
+    const recs=(byType[currentType][code]||[]).slice().sort((a,b)=>a.sku.localeCompare(b.sku));
+    const imgData = pdfPrepImage;
+    const mode=(document.querySelector('input[name="pdfOrder"]:checked')||{}).value||'sku';
+    const pdf=await buildCatalogPdf(recs, PT_NAME[currentType]+' — '+NAME_BY_CODE[code], imgData,
+      (d,t)=>{link.textContent=d+'/'+t+'…';}, mode);
+    pdf.save('catalog-'+(FLAT[currentType]?currentType:currentType+'-'+code)+(mode==='color'?'-colour':'')+'-'+new Date().toISOString().slice(0,10)+'.pdf');
+  } finally { link.textContent=orig; }
+}
+
+/* ================= SKU-on-image ink picker ================= */
+function skuInkFor(img, tag){
+  let ink='#111';
+  try{
+    const w=img.naturalWidth,h=img.naturalHeight;
+    const c=document.createElement('canvas'); c.width=40; c.height=16;
+    const x=c.getContext('2d');
+    x.drawImage(img, w*0.72, h*0.88, w*0.28, h*0.12, 0,0,40,16);
+    const d=x.getImageData(0,0,40,16).data;
+    let lum=0,n=0; for(let i=0;i<d.length;i+=16){ lum+=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; n++; }
+    if(n && (lum/n)<128) ink='#fff';
+  }catch(e){}
+  tag.style.color=ink;
+  // keep the label inside the image bottom edge (plate sits below image)
+  tag.style.bottom = (tag.parentNode.querySelector('.sku-plate').offsetHeight + 12) + 'px';
+}
+/* ================= full-screen viewer ================= */
+let VIEWLIST=[], vwIdx=-1, vwPushed=false;
+function vwOpen(i){
+  vwIdx=i; vwRender();
+  document.getElementById('vw').classList.add('show');
+  document.body.style.overflow='hidden';
+  try{ history.pushState({vw:1},''); vwPushed=true; }catch(e){ vwPushed=false; }
+}
+function vwRender(){
+  const sku=VIEWLIST[vwIdx]; if(!sku) return;
+  const img=document.getElementById('vwImg');
+  img.src='/api/image/'+sku+'.jpg';
+  document.getElementById('vwSku').textContent=sku;
+  document.getElementById('vwPrev').disabled = vwIdx<=0;
+  document.getElementById('vwNext').disabled = vwIdx>=VIEWLIST.length-1;
+}
+function vwStep(d){
+  const n=vwIdx+d;
+  if(n<0||n>=VIEWLIST.length) return;
+  vwIdx=n; vwRender();
+}
+function vwClose(fromPop){
+  document.getElementById('vw').classList.remove('show');
+  document.body.style.overflow='';
+  if(!fromPop && vwPushed){ vwPushed=false; try{ history.back(); }catch(e){} }
+  else vwPushed=false;
+}
+window.addEventListener('popstate',()=>{
+  if(document.getElementById('vw').classList.contains('show')) vwClose(true);
+});
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('vw').classList.contains('show')) return;
+  if(e.key==='ArrowLeft') vwStep(-1);
+  else if(e.key==='ArrowRight') vwStep(1);
+  else if(e.key==='Escape') vwClose();
+});
+/* touch swipe (bonus; buttons remain primary) */
+(function(){
+  let sx=null;
+  const vw=document.getElementById('vw');
+  vw.addEventListener('touchstart',e=>{ if(e.touches.length===1) sx=e.touches[0].clientX; },{passive:true});
+  vw.addEventListener('touchend',e=>{
+    if(sx===null) return;
+    const dx=e.changedTouches[0].clientX-sx; sx=null;
+    if(Math.abs(dx)>60) vwStep(dx<0?1:-1);
+  },{passive:true});
+})();
+/* ================= scroll to top ================= */
+window.addEventListener('scroll',()=>{
+  document.getElementById('topBtn').classList.toggle('show', window.scrollY>600);
+},{passive:true});
+
+boot();
+</script>
+</body>
+</html>

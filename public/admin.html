@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catalog Admin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+<style>
+  :root{ --ink:#211d17; --paper:#faf8f4; --card:#fff; --line:#e7e1d6; --brass:#a9822f;
+    --brass-soft:#f3ead6; --muted:#8a8175; --ok:#2e7d32; --warn:#c62828; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:14px;line-height:1.5}
+  header{background:var(--ink);color:#f5efe2;padding:16px 24px;display:flex;align-items:baseline;gap:14px}
+  header h1{font-size:16px;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+  header small{color:var(--brass);letter-spacing:.25em;font-size:10px;text-transform:uppercase}
+  header .tot{margin-left:auto;font-size:12px;color:#cbbfa3}
+  main{max-width:1000px;margin:0 auto;padding:24px 18px 80px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px 22px;margin-bottom:18px}
+  .panel h2{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--brass);margin-bottom:14px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  label{font-weight:600;font-size:13px}
+  select,input[type=password]{padding:9px 12px;border:1px solid var(--line);border-radius:5px;font-size:14px;background:#fff;min-width:220px}
+  .btn{background:var(--ink);color:#f0e6cf;border:none;border-radius:5px;padding:11px 20px;font-weight:700;font-size:13px;letter-spacing:.05em;cursor:pointer}
+  .btn.brass{background:var(--brass);color:#fff}
+  .btn.ghost{background:none;border:1px solid var(--line);color:var(--muted)}
+  .btn.danger{background:none;border:1px solid #e5b3b3;color:var(--warn);font-size:12px;padding:5px 10px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .drop{border:2px dashed var(--line);border-radius:8px;padding:36px;text-align:center;color:var(--muted);cursor:pointer;margin-top:14px}
+  .drop.over{border-color:var(--brass);background:var(--brass-soft)}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+  td img{width:64px;height:48px;object-fit:cover;border-radius:3px;display:block}
+  .sku{font-weight:700;letter-spacing:.05em}
+  .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:3px;padding:2px 8px}
+  .tag.ok{background:#e6f2e6;color:var(--ok)}
+  .tag.flag{background:#fde7e7;color:var(--warn)}
+  .tag.done{background:#e8eefc;color:#2a4f9e}
+  .note{font-size:12.5px;color:var(--muted)}
+  .hidden{display:none}
+  #gate{max-width:360px;margin:12vh auto;text-align:center}
+  #gate .panel{padding:30px}
+  #uplog{font-size:12px;color:var(--muted);margin-top:10px;white-space:pre-line}
+  .manage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-top:14px}
+  .m-item{text-align:center}
+  .m-item img{width:100%;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+  .m-item .sku{font-size:12px;display:block;margin:6px 0 4px}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="panel">
+    <h2>Catalog Admin</h2>
+    <p class="note" style="margin-bottom:14px">Team access only.</p>
+    <input type="password" id="pw" placeholder="Admin password" style="width:100%;margin-bottom:12px">
+    <button class="btn brass" style="width:100%" onclick="login()">Enter</button>
+    <p class="note" id="gateMsg" style="margin-top:10px"></p>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+<header>
+  <h1>Catalog Admin</h1><small>Team</small>
+  <span class="tot" id="totTag"></span>
+</header>
+<main>
+
+  <div class="panel">
+    <h2>Add designs</h2>
+    <div class="row">
+      <label>Print type:</label>
+      <select id="ptypeSelect" onchange="ptypeChanged()">
+        <option value="IJ">Inkjet Prints (IJ)</option>
+        <option value="CV">Canvas Printing (CV)</option>
+        <option value="TX">Texture Canvas Printing (TX)</option>
+        <option value="3D">3D Wall Art (3D)</option>
+        <option value="LT">Leather Paintings (LT)</option>
+      </select>
+      <span id="catWrap" style="display:contents">
+        <label>Category:</label>
+        <select id="groupSelect" onchange="fillCollections()"></select>
+        <label>Collection:</label>
+        <select id="collectionSelect"></select>
+      </span>
+    </div>
+    <div class="drop" id="dropZone" onclick="document.getElementById('imgInput').click()">
+      Drop images here, or click to choose files.<br>
+      <span style="font-size:12px">Each image is auto-assigned to its closest ratio (20% tolerance). Truly odd files show a one-click <b>Crop</b> fix. Duplicates are detected automatically. Print masters are stored in the vault.<br>
+<b>SKU first digit = shape:</b> 1 L2:3 · 2 L3:4 · 3 Pano · 4 P2:3 · 5 P3:4 · 6 P1:2 · 7 Square — each shape numbers separately, gaps are retired numbers (normal).</span>
+    </div>
+    <input type="file" id="imgInput" accept="image/*" multiple class="hidden" onchange="handleFiles(this.files)">
+  </div>
+
+  <div class="panel" id="queuePanel" style="display:none">
+    <h2>This batch</h2>
+    <table>
+      <thead><tr><th>Preview</th><th>File</th><th>Pixels</th><th>Detected</th><th>SKU</th><th>Status</th></tr></thead>
+      <tbody id="queueBody"></tbody>
+    </table>
+    <div class="row" style="margin-top:14px">
+      <button class="btn brass" id="uploadBtn" onclick="uploadBatch()" disabled>Upload to live catalog</button>
+      <button class="btn" type="button" onclick="clearQueue()" style="margin-left:8px">Clear list</button>
+      <span class="note">Numbers are assigned by the server at upload — safe even if two people upload at once.</span>
+    </div>
+    <div id="uplog"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Show / hide collections</h2>
+    <div class="row">
+      <label>Print type:</label>
+      <select id="visPtype">
+        <option value="IJ">Inkjet Prints</option>
+        <option value="CV">Canvas Printing</option>
+        <option value="TX">Texture Canvas Printing</option>
+        <option value="3D">3D Wall Art</option><option value="LT">Leather Paintings</option>
+      </select>
+      <button class="btn ghost" onclick="loadVisibility()">Load collections</button>
+    </div>
+    <table id="visTable" style="display:none">
+      <thead><tr><th>Collection</th><th>Designs</th><th>Status</th><th></th></tr></thead>
+      <tbody id="visBody"></tbody>
+    </table>
+    <p class="note" style="margin-top:10px">Hidden collections disappear from the website and all PDFs instantly. Designs and numbering stay safe — unhide anytime. Collections with zero designs never appear anyway.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Catalog PDF</h2>
+    <div class="row" style="margin-bottom:12px">
+      <label>Print type:</label>
+      <select id="pdfPtype" onchange="pdfPtypeChanged()">
+        <option value="IJ">Inkjet Prints</option>
+        <option value="CV">Canvas Printing</option>
+        <option value="TX">Texture Canvas Printing</option>
+        <option value="3D">3D Wall Art</option><option value="LT">Leather Paintings</option>
+      </select>
+      <span id="pdfCatWrap" style="display:contents">
+        <label>Collection:</label>
+        <select id="pdfSelect"></select>
+      </span>
+    </div>
+    <div class="row">
+<select id="pdfOrder"><option value="sku">By SKU</option><option value="color">By colour theme</option></select>
+            <button class="btn brass" onclick="adminPdf()">Generate PDF</button>
+      <span class="note">Dated "Updated as on" header on every page.</span>
+    </div>
+    <div id="pdfLog" class="note" style="margin-top:8px"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Backups &amp; print masters</h2>
+    <div class="row">
+      <button class="btn ghost" onclick="fullBackup()">Catalog backup (display images + data)</button>
+      <span class="note">Monthly. Can rebuild the catalog from zero.</span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <select id="origPtype">
+        <option value="IJ">Inkjet Prints</option><option value="CV">Canvas Printing</option>
+        <option value="TX">Texture Canvas Printing</option><option value="3D">3D Wall Art</option><option value="LT">Leather Paintings</option>
+      </select>
+      <select id="origSelect"></select>
+      <button class="btn brass" onclick="originalsZip()">Download print masters (ZIP)</button>
+      <span class="note">Full-resolution originals, SKU-named. Desktop only.</span>
+    </div>
+    <div style="margin:8px 0 0 4px;font-size:13px;line-height:2">
+      <div class="note" id="dlMarkNote" style="font-weight:600"></div>
+      <label style="cursor:pointer;display:block"><input type="radio" name="dlMode" value="since" checked> <b>New designs only</b> — everything added since the last download</label>
+      <label style="cursor:pointer;display:block"><input type="radio" name="dlMode" value="from"> <b>From a date I choose:</b> <input type="date" id="dlFromDate" style="margin-left:6px"> — everything added on or after this date</label>
+      <label style="cursor:pointer;display:block"><input type="radio" name="dlMode" value="full"> <b>Full collection</b> — every design, regardless of dates</label>
+      <div class="note" id="dlPreview" style="margin-top:2px"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <span id="ckWrap" style="display:none">
+      <button class="btn ghost" onclick="backfillCk()">Analyse colours (older designs)</button>
+      <span class="note">Some designs are missing colour data — one click repairs them all.</span>
+      </span>
+    </div>
+    <div id="bkLog" class="note" style="margin-top:8px"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Customers</h2>
+    <div class="note" style="margin-bottom:10px">Everyone who registered on the catalog website. Newest first.</div>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn ghost" onclick="loadCustomers()">Load customers</button>
+      <button class="btn brass" onclick="exportCustomers()" id="custCsvBtn" disabled>Download Excel (CSV)</button>
+      <span class="note" id="custCount"></span>
+    </div>
+    <div id="custList" style="overflow-x:auto"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Manage / remove designs</h2>
+    <div class="row" style="margin-bottom:10px">
+      <input type="text" id="skuSearch" placeholder="Search any SKU across all catalogs — e.g. CV-RDKR-1042 or just 1042"
+        style="flex:1;min-width:240px;padding:9px 12px" autocomplete="off">
+      <button class="btn brass" onclick="skuFind()">Find</button>
+    </div>
+    <div class="row">
+      <label>Print type:</label>
+      <select id="managePtype" onchange="managePtypeChanged()">
+        <option value="IJ">Inkjet Prints</option>
+        <option value="CV">Canvas Printing</option>
+        <option value="TX">Texture Canvas Printing</option>
+        <option value="3D">3D Wall Art</option><option value="LT">Leather Paintings</option>
+      </select>
+      <span id="manageCatWrap" style="display:contents">
+        <label>Collection:</label>
+        <select id="manageSelect"></select>
+      </span>
+      <button class="btn ghost" onclick="loadManage()">Show designs</button>
+    </div>
+    <div class="manage-grid" id="manageGrid"></div>
+    <p class="note" style="margin-top:10px">Removing a design takes it off the catalog immediately. Its number is never given to another design.</p>
+  </div>
+
+</main>
+</div>
+
+<script>
+const STRUCTURE = [
+ ["Master Categories",[["MODN", "Modern Art"], ["ABST", "Abstract Art"], ["OFFC", "Office Art"], ["BOHO", "Boho"], ["BLKW", "Black & White"], ["FLRL", "Floral"], ["HRSE", "Horses"], ["CITY", "City & Landscapes"], ["TRVL", "Travel"], ["ASTR", "Astronomy & Space"], ["MUSC", "Music"], ["KTCH", "Kitchen / Food"], ["KIDS", "Kids Room"], ["BABY", "Baby / Cute Kids"], ["MOTV", "Motivational"], ["WMEN", "Women"], ["CUPL", "Couple"], ["EURO", "European Vintage"], ["PATR", "Patriotic / Freedom Fighters"], ["FMPT", "Famous Paintings"], ["MNDL", "Mandala"], ["AMRC", "America"]]],
+ ["Nature",[["NATR", "Nature – General"], ["CSTL", "Coastal & Beach"], ["MNTN", "Mountains"], ["FRST", "Forests & Trees"], ["SESN", "Seasons"], ["CHRY", "Cherry Blossom / Japanese"], ["TRPC", "Tropical & Palms"], ["BTNC", "Botanical"]]],
+ ["Wildlife",[["WILD", "Wildlife – General"], ["LNTG", "Lions & Tigers"], ["ELPH", "Elephants"], ["DEER", "Deer & Stag"], ["SEAL", "Sea Life"], ["BIRD", "Birds"]]],
+ ["Automobile",[["AUTO", "Automobile – General"], ["BIKE", "Bikes & Motorcycles"], ["CARS", "Cars"]]],
+ ["Sports",[["GYMF", "Gym & Fitness"], ["FTBL", "Football"], ["CRKT", "Cricket"], ["FRML", "Formula 1"], ["GOLF", "Golf"], ["BSBL", "Baseball"], ["BSKT", "Basketball"], ["BOXG", "Boxing"], ["MMAF", "MMA"]]],
+ ["Pop Culture",[["POPM", "Pop Art / Maximalist"], ["GRFT", "Graffiti & Street Art"], ["HUMR", "Humor & Quirky"], ["SRRL", "Surreal"]]],
+ ["Healthcare",[["MTRN", "Maternity Clinic"], ["DNTL", "Dental"], ["HART", "Heart"], ["HLTH", "Healthcare General"]]],
+ ["Vastu & Feng Shui",[["VHRS", "Seven Running Horses"], ["VWTR", "Waterfall"], ["VPHX", "Phoenix"], ["VLTS", "Lotus"], ["VKOI", "Koi Fish"], ["VBUD", "Buddha (Vastu)"], ["VTRE", "Tree of Life"], ["VPCK", "Peacock"], ["VGEN", "General Vastu"], ["VSUN", "Sunrise"], ["VYNT", "Shri Yantra"]]],
+ ["Traditional",[["PICH", "Pichwai"], ["SHNJ", "Shreenath Ji"], ["MDHB", "Madhubani"], ["KERM", "Kerala Mural"], ["MUGL", "Mughal Ethnic"], ["BNRS", "Banaras Ghat"], ["KLGT", "Kalighat"], ["WRLI", "Warli"], ["GOND", "Gond"], ["PTCH", "Pattachitra"], ["KLMK", "Kalamkari"], ["TNJR", "Tanjore Style"], ["PHAD", "Phad"], ["RJPM", "Rajput / Pahari Miniature"], ["MYSR", "Mysore Painting"], ["CHRL", "Cheriyal Scroll"], ["DOOR", "Rajasthani Doors & Jharokha"], ["DANC", "Indian Classical Dance"]]],
+ ["Religious",[["KRSN", "Krishna"], ["RDKR", "Radha Krishna"], ["BLKR", "Bal Krishna"], ["RDHA", "Radha"], ["SHIV", "Shiva"], ["SHPV", "Shiv Parivar"], ["GNSH", "Ganesha"], ["LKSM", "Lakshmi"], ["LKGN", "Lakshmi Ganesh"], ["LGST", "Lakshmi Ganesh Saraswati"], ["SRSW", "Saraswati"], ["RAMA", "Ram / Ram Lala"], ["RMDB", "Ram Darbar"], ["STRM", "Sita Ram"], ["HNMN", "Hanuman"], ["DRGA", "Durga / Devi"], ["KALI", "Kali"], ["SNTM", "Santoshi Maa"], ["VSNU", "Vishnu / Vishnu Lakshmi"], ["GNGA", "Ganga Maiya"], ["SHNI", "Shani Dev"], ["NVGR", "Navgraha"], ["VSWK", "Vishwakarma"], ["SAIB", "Sai Baba"], ["KTSY", "Khatu Shyam"], ["JHLL", "Jhulelal"], ["NKRB", "Neem Karoli Baba"], ["SWMN", "Swaminarayan"], ["TRPB", "Tirupati Balaji"], ["MRGN", "Murugan"], ["AYPA", "Ayyappa"], ["MNKS", "Meenakshi"], ["VSHD", "Vaishno Devi"], ["BUDH", "Buddha"], ["MHVR", "Mahavir / Jain"], ["SIKH", "Sikhism"], ["JSMM", "Jesus / Mother Mary"], ["ISLM", "Islamic Calligraphy"], ["AMBK", "Ambedkar"], ["SPRT", "Spiritual General"], ["MHBT", "Mahabharata"], ["GLDT", "Golden Temple"], ["JGNT", "Jagannath"], ["RMND", "Ram Mandir Ayodhya"], ["NTRJ", "Nataraja"], ["OMSY", "Om & Sacred Symbols"], ["SHLK", "Sanskrit / Shloka Calligraphy"], ["GITA", "Gita Updesh"], ["KEDR", "Kedarnath / Char Dham"], ["ASHT", "Ashtalakshmi"], ["DSHV", "Dashavatar"], ["GRNK", "Guru Nanak / Sikh Gurus"], ["SURY", "Surya Dev"], ["MECC", "Mecca & Madina"]]],
+ ["India States",[["PNJB", "Punjab"], ["RJST", "Rajasthan"], ["HRYA", "Haryana"], ["ODIS", "Odisha"], ["ASSM", "Assam"], ["HMPR", "Himachal Pradesh"], ["UTRK", "Uttarakhand"], ["UTPR", "Uttar Pradesh"], ["MDPR", "Madhya Pradesh"], ["MHRA", "Maharashtra"], ["GUJR", "Gujarat"], ["GOAA", "Goa"], ["KERL", "Kerala"], ["TMND", "Tamil Nadu"], ["KRNT", "Karnataka"], ["ANPR", "Andhra Pradesh"], ["TLNG", "Telangana"], ["WBNG", "West Bengal"], ["BIHR", "Bihar"], ["JHKD", "Jharkhand"], ["CHTG", "Chhattisgarh"], ["SIKM", "Sikkim"], ["ARNC", "Arunachal Pradesh"], ["NGLD", "Nagaland"], ["MNPR", "Manipur"], ["MZRM", "Mizoram"], ["TRPR", "Tripura"], ["MGHL", "Meghalaya"], ["DLHI", "Delhi"], ["JMKS", "Jammu & Kashmir"], ["LDKH", "Ladakh"], ["PDCH", "Puducherry"], ["ANDM", "Andaman & Nicobar"]]],
+ ["Hotel Destinations",[["JAIP", "Jaipur"], ["UDAI", "Udaipur"], ["JODH", "Jodhpur"], ["JSLM", "Jaisalmer"], ["AGRA", "Agra"], ["VRNS", "Varanasi"], ["AMRT", "Amritsar"], ["RSHK", "Rishikesh–Haridwar"], ["SHML", "Shimla"], ["MNLI", "Manali"], ["MSRE", "Dehradun–Mussoorie"], ["NNTL", "Nainital"], ["LEHL", "Leh–Ladakh"], ["DRJL", "Darjeeling"], ["GNTK", "Gangtok"], ["SHLG", "Shillong"], ["KZRG", "Guwahati–Kaziranga"], ["PURI", "Puri"], ["GOAH", "Goa"], ["MUMB", "Mumbai"], ["PUNE", "Pune"], ["MTAB", "Mount Abu"], ["BHUJ", "Rann of Kutch–Bhuj"], ["KOCH", "Kochi"], ["MNNR", "Munnar"], ["OOTY", "Ooty"], ["MYSU", "Mysuru"], ["CORG", "Coorg"], ["CRBT", "Jim Corbett"], ["RNTH", "Ranthambore"], ["DELH", "Delhi"], ["BLRU", "Bengaluru"]]]
+];
+const BUCKETS = [[1,"Landscape 2:3",1.5],[2,"Landscape 3:4",4/3],[3,"Landscape 1:2",2.0],
+ [4,"Portrait 2:3",2/3],[5,"Portrait 3:4",0.75],[6,"Portrait 1:2",0.5],[7,"Square 1:1",1.0]];
+const TOL = 0.20, MAX_EDGE = 1200, JPEG_Q = 0.85;
+
+let KEY = sessionStorage.getItem('adminKey') || '';
+
+async function login(){
+  const pw = document.getElementById('pw').value;
+  const res = await fetch('/api/auth',{method:'POST',headers:{'x-admin-key':pw}});
+  if(res.ok){
+    KEY = pw; sessionStorage.setItem('adminKey', pw);
+    document.getElementById('gate').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden'); refreshCustCount();
+    refreshTotal();
+  } else {
+    document.getElementById('gateMsg').textContent = 'Wrong password.';
+  }
+}
+if(KEY){ login = login; (async()=>{ // auto-login if session key valid
+  const res = await fetch('/api/auth',{method:'POST',headers:{'x-admin-key':KEY}});
+  if(res.ok){ document.getElementById('gate').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden'); refreshCustCount(); refreshTotal(); }
+})(); }
+
+async function refreshTotal(){
+  const res = await fetch('/api/catalog');
+  const data = await res.json();
+  const all = data.designs||[];
+  document.getElementById('totTag').textContent = all.length + ' designs live';
+  const needCk = all.some(d=>d.ck==null);
+  const w=document.getElementById('ckWrap'); if(w) w.style.display = needCk?'':'none';
+}
+
+/* dropdowns */
+const gSel = document.getElementById('groupSelect');
+const cSel = document.getElementById('collectionSelect');
+const mSel = document.getElementById('manageSelect');
+STRUCTURE.forEach(([group],i)=>{
+  const o=document.createElement('option'); o.value=i; o.textContent=group; gSel.appendChild(o);
+});
+function fillCollections(){
+  cSel.innerHTML='';
+  STRUCTURE[gSel.value][1].forEach(([code,name])=>{
+    const o=document.createElement('option'); o.value=code; o.textContent=`${name}  (${code})`; cSel.appendChild(o);
+  });
+}
+fillCollections();
+function ptypeChanged(){
+  document.getElementById('catWrap').style.display =
+    FLAT[document.getElementById('ptypeSelect').value] ? 'none' : 'contents';
+}
+function managePtypeChanged(){
+  document.getElementById('manageCatWrap').style.display =
+    FLAT[document.getElementById('managePtype').value] ? 'none' : 'contents';
+}
+STRUCTURE.forEach(([group,items])=>{
+  const og=document.createElement('optgroup'); og.label=group;
+  items.forEach(([code,name])=>{ const o=document.createElement('option'); o.value=code; o.textContent=`${name} (${code})`; og.appendChild(o); });
+  mSel.appendChild(og);
+});
+
+/* intake */
+let queue = [];
+function clearQueue(){ queue.length=0; renderQueue(); document.getElementById('uplog').textContent=''; }
+['ptypeSelect','groupSelect','collectionSelect'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('change', clearQueue);
+});
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');handleFiles(e.dataTransfer.files);});
+
+function handleFiles(files){
+  const ptype = document.getElementById('ptypeSelect').value;
+  const code = FLAT[ptype] || cSel.value;
+  [...files].forEach(async file=>{
+    if(!file.type.startsWith('image/')) return;
+    let hash=null;
+    try{
+      const buf=await file.arrayBuffer();
+      const dg=await crypto.subtle.digest('SHA-256',buf);
+      hash=[...new Uint8Array(dg)].map(b=>b.toString(16).padStart(2,'0')).join('');
+    }catch(e){}
+    const img = new Image();
+    img.onload = async ()=>{
+      const ratio = img.naturalWidth/img.naturalHeight;
+      let nearest=null, nearDiff=Infinity;
+      for(const [d,name,target] of BUCKETS){
+        const diff=Math.abs(ratio-target)/target;
+        if(diff<nearDiff){ nearDiff=diff; nearest=[d,name,target]; }
+      }
+      const hit = (nearDiff <= TOL) ? [nearest[0],nearest[1]] : null;
+      const ck = colorKeyFromImg(img);
+      const rec = {file, img, hash, ck, w:img.naturalWidth, h:img.naturalHeight, code, ptype,
+        bucket: hit?hit[0]:null, bucketName: hit?hit[1]:null,
+        nearest, nearDiff,
+        status: hit?'ready':'flag', sku:null};
+      // duplicate inside this queue?
+      if(hash && queue.some(q=>q.hash===hash && q.status!=='failed')){
+        rec.dupOf='this batch'; rec.status='dup';
+      } else if(hash){
+        // duplicate already in the live catalog?
+        try{
+          const r=await fetch('/api/hashcheck',{method:'POST',
+            headers:{'Content-Type':'application/json','x-admin-key':KEY},
+            body:JSON.stringify({hashes:[hash]})});
+          const m=(await r.json()).matches||{};
+          if(m[hash]){ rec.dupOf=m[hash]; rec.status='dup'; }
+        }catch(e){}
+      }
+      queue.push(rec); renderQueue();
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function renderQueue(){
+  const tb = document.getElementById('queueBody'); tb.innerHTML='';
+  let ready=0;
+  queue.forEach(rec=>{
+    if(rec.status==='ready') ready++;
+    const tag = rec.status==='ready' ? '<span class="tag ok">Ready</span>'
+      : rec.status==='flag' ? '<span class="tag flag">Flagged</span>'
+      : rec.status==='dup' ? '<span class="tag flag">Duplicate of '+rec.dupOf+'</span>'
+      : rec.status==='done' ? '<span class="tag done">Live</span>'
+      : '<span class="tag flag">Failed</span>';
+    const tr=document.createElement('tr');
+    const idx=queue.indexOf(rec);
+    const trimPct=rec.nearest?Math.round(rec.nearDiff*100):0;
+    const fixBtn = rec.status==='flag' && rec.nearest
+      ? `<br><button type="button" onclick="cropFix(${idx})" style="margin-top:4px;font-size:11px;padding:3px 8px;cursor:pointer">Crop to ${rec.nearest[1]} (trims ~${trimPct}%)</button>`
+      : rec.status==='dup'
+      ? `<br><button type="button" onclick="dupOverride(${idx})" style="margin-top:4px;font-size:11px;padding:3px 8px;cursor:pointer">Upload anyway</button>`
+      : '';
+    tr.innerHTML=`<td><img src="${rec.img.src}"></td><td>${rec.file.name}</td>
+      <td>${rec.w} × ${rec.h}</td><td>${rec.bucketName||'—'}</td>
+      <td class="sku">${rec.sku||'—'}</td><td>${tag}${fixBtn}</td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('queuePanel').style.display = queue.length?'block':'none';
+  document.getElementById('uploadBtn').disabled = ready===0;
+}
+
+function colorKeyFromImg(img){
+  const k=_hueKeyFromImg(img);
+  return k===999999?null:k;
+}
+function originalBlob(rec){
+  if(!rec.cw) return Promise.resolve(rec.file);          // untouched master
+  // Crop was applied: vault gets the SAME crop at full resolution, so print always matches catalog
+  const natW=rec.img.naturalWidth, natH=rec.img.naturalHeight;
+  const sx=Math.round((natW-rec.cw)/2), sy=Math.round((natH-rec.ch)/2);
+  const c=document.createElement('canvas'); c.width=rec.cw; c.height=rec.ch;
+  c.getContext('2d').drawImage(rec.img,sx,sy,rec.cw,rec.ch,0,0,rec.cw,rec.ch);
+  return new Promise(res=>c.toBlob(res,'image/jpeg',0.92));
+}
+function dupOverride(i){
+  const rec=queue[i]; if(!rec) return;
+  rec.status = rec.bucket ? 'ready' : 'flag';   // still respects the ratio gate
+  rec.dupOf=null;
+  renderQueue();
+}
+function cropFix(i){
+  const rec=queue[i]; if(!rec||!rec.nearest) return;
+  const [d,name,target]=rec.nearest;
+  const natW=rec.img.naturalWidth, natH=rec.img.naturalHeight, ratio=natW/natH;
+  if(ratio>target){ rec.cw=Math.round(natH*target); rec.ch=natH; }
+  else { rec.cw=natW; rec.ch=Math.round(natW/target); }
+  rec.w=rec.cw; rec.h=rec.ch;
+  rec.bucket=d; rec.bucketName=name+' · cropped'; rec.status='ready';
+  renderQueue();
+}
+/* processing: resize (+ optional center-crop) — artwork stays clean, SKU lives below the image everywhere */
+function processImage(rec){
+  const {img} = rec;
+  const natW=img.naturalWidth, natH=img.naturalHeight;
+  const sw=rec.cw||natW, sh=rec.ch||natH;
+  const sx=Math.round((natW-sw)/2), sy=Math.round((natH-sh)/2);
+  const scale=Math.min(1, MAX_EDGE/Math.max(sw,sh));
+  const w=Math.round(sw*scale), h=Math.round(sh*scale);
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d');
+  x.drawImage(img,sx,sy,sw,sh,0,0,w,h);
+  return new Promise(res=>c.toBlob(res,'image/jpeg',JPEG_Q));
+}
+
+async function uploadBatch(){
+  const log = document.getElementById('uplog');
+  const batch = queue.filter(q=>q.status==='ready');
+  document.getElementById('uploadBtn').disabled = true;
+  let done=0, failed=0, origFails=0;
+  for(const rec of batch){
+    try{
+      log.textContent = `Uploading… ${done+failed+1}/${batch.length}`;
+      const r1 = await fetch('/api/reserve',{method:'POST',
+        headers:{'Content-Type':'application/json','x-admin-key':KEY},
+        body:JSON.stringify({ptype:rec.ptype,code:rec.code,bucket:rec.bucket,w:rec.w,h:rec.h,hash:rec.hash,ck:rec.ck})});
+      if(!r1.ok) throw new Error((await r1.json()).error||'reserve failed');
+      rec.sku = (await r1.json()).sku;
+      renderQueue();
+      const blob = await processImage(rec);
+      const r2 = await fetch('/api/upload/'+rec.sku,{method:'POST',
+        headers:{'x-admin-key':KEY},body:blob});
+      if(!r2.ok) throw new Error('upload failed');
+      try{
+        log.textContent = `Storing print master… ${done+failed+1}/${batch.length}`;
+        const origBlob = await originalBlob(rec);
+        const r3 = await fetch('/api/upload-original/'+rec.sku,{method:'POST',
+          headers:{'x-admin-key':KEY,'x-orig-type':origBlob.type||'application/octet-stream'},
+          body:origBlob});
+        if(!r3.ok) throw new Error('vault failed');
+      }catch(e){ rec.origFailed=true; origFails++; }
+      rec.status='done'; done++;
+    }catch(e){
+      rec.status='failed'; failed++;
+    }
+    renderQueue();
+  }
+  const liveSkus = batch.filter(q=>q.status==='done').map(q=>q.sku);
+  const skuNote = liveSkus.length ? ` (${liveSkus[0]}${liveSkus.length>1?' … '+liveSkus[liveSkus.length-1]:''})` : '';
+  log.textContent = `Done — ${done} design(s) live${skuNote}${failed?`, ${failed} failed (try again)`:''}${origFails?` · ${origFails} print master(s) did not reach the vault — re-upload those or store them in Drive`:''}. The public catalog is already updated.`;
+  queue = queue.filter(q=>q.status!=='done');
+  renderQueue();
+  refreshTotal();
+}
+
+/* visibility */
+async function loadVisibility(){
+  const pt = document.getElementById('visPtype').value;
+  const res = await fetch('/api/catalog?all=1',{headers:{'x-admin-key':KEY}});
+  const data = await res.json();
+  const hiddenSet = new Set((data.hidden||[]).filter(h=>h.ptype===pt).map(h=>h.code));
+  const counts = {};
+  (data.designs||[]).forEach(d=>{ if(d.ptype===pt) counts[d.code]=(counts[d.code]||0)+1; });
+  const tb = document.getElementById('visBody');
+  tb.innerHTML='';
+  const rows = FLAT[pt] ? [[FLAT[pt], PT_NAME[pt]]] : STRUCTURE.flatMap(([g,items])=>items);
+  rows.forEach(([code,name])=>{
+    const n = counts[code]||0;
+    const isHidden = hiddenSet.has(code);
+    if(n===0 && !isHidden) return;   // zero-design collections are auto-invisible; nothing to manage
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${name} <span class="note">(${code})</span></td>
+      <td>${n}</td>
+      <td>${isHidden?'<span class="tag flag">Hidden</span>':'<span class="tag ok">Visible</span>'}</td>
+      <td><button class="btn ghost" style="padding:5px 12px;font-size:12px">${isHidden?'Unhide':'Hide'}</button></td>`;
+    tr.querySelector('button').onclick = async ()=>{
+      await fetch('/api/hide',{method:'POST',
+        headers:{'Content-Type':'application/json','x-admin-key':KEY},
+        body:JSON.stringify({ptype:pt,code,hidden:!isHidden})});
+      loadVisibility();
+    };
+    tb.appendChild(tr);
+  });
+  document.getElementById('visTable').style.display = tb.children.length ? 'table' : 'none';
+  if(!tb.children.length) alert('No collections with designs in this print type yet.');
+}
+
+/* manage */
+async function loadManage(){
+  const pt = document.getElementById('managePtype').value;
+  const code = FLAT[pt] || mSel.value;
+  const res = await fetch('/api/catalog?all=1',{headers:{'x-admin-key':KEY}});
+  const data = await res.json();
+  const recs = (data.designs||[]).filter(d=>d.ptype===pt && d.code===code).sort((a,b)=>a.sku.localeCompare(b.sku));
+  renderManageCards(recs, 'No designs in this collection yet.');
+}
+function renderManageCards(recs, emptyMsg){
+  const grid = document.getElementById('manageGrid');
+  grid.innerHTML = recs.length?'':'<p class="note">'+emptyMsg+'</p>';
+  recs.forEach(d=>{
+    const div=document.createElement('div'); div.className='m-item';
+    div.innerHTML=`<img loading="lazy" src="/api/image/${d.sku}.jpg">
+      <span class="sku">${d.sku}</span>
+      <button class="btn ghost" style="margin-bottom:4px">Print file</button>
+      <button class="btn danger">Remove</button>`;
+    div.querySelector('.btn.ghost').onclick = async ()=>{
+      const r=await fetch('/api/original/'+d.sku,{headers:{'x-admin-key':KEY}});
+      if(!r.ok){ alert('No print master stored for '+d.sku+' (uploaded before the vault existed).'); return; }
+      const cd=r.headers.get('Content-Disposition')||'';
+      const fname=(cd.match(/filename="([^"]+)"/)||[])[1]||d.sku+'.jpg';
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(await r.blob()); a.download=fname; a.click();
+      URL.revokeObjectURL(a.href);
+    };
+    div.querySelector('.btn.danger').onclick = async ()=>{
+      if(!confirm('Remove '+d.sku+' from the live catalog?')) return;
+      await fetch('/api/design/'+d.sku,{method:'DELETE',headers:{'x-admin-key':KEY}});
+      loadManage(); refreshTotal();
+    };
+    grid.appendChild(div);
+  });
+}
+
+/* global SKU search — works across all four catalogs, ignores the dropdowns */
+async function skuFind(){
+  const q=document.getElementById('skuSearch').value.trim().toUpperCase();
+  if(!q){ renderManageCards([], 'Type a SKU (or part of one) and press Find.'); return; }
+  const res=await fetch('/api/catalog?all=1',{headers:{'x-admin-key':KEY}});
+  const data=await res.json();
+  const recs=(data.designs||[]).filter(d=>d.sku.toUpperCase().includes(q))
+    .sort((a,b)=>a.sku.localeCompare(b.sku)).slice(0,60);
+  renderManageCards(recs, 'No SKU matches "'+q+'" in any catalog.');
+}
+document.getElementById('skuSearch').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); skuFind(); }});
+
+/* ================= admin PDF (mesh / clean) ================= */
+const PT_NAME = {IJ:"Inkjet Prints",CV:"Canvas Printing",TX:"Texture Canvas Printing","3D":"3D Wall Art",LT:"Leather Paintings"};
+const FLAT = {"3D":"ART",LT:"LTH"};  // flat print types: one series, no collections
+const NAME_BY_CODE = {ART:"3D Wall Art", LTH:"Leather Paintings"};
+STRUCTURE.forEach(([g,items])=>items.forEach(([c,n])=>NAME_BY_CODE[c]=n));
+const pdfSelEl = document.getElementById('pdfSelect');
+STRUCTURE.forEach(([group,items])=>{
+  const og=document.createElement('optgroup'); og.label=group;
+  items.forEach(([code,name])=>{ const o=document.createElement('option'); o.value=code; o.textContent=`${name} (${code})`; og.appendChild(o); });
+  pdfSelEl.appendChild(og);
+});
+function pdfPtypeChanged(){
+  document.getElementById('pdfCatWrap').style.display =
+    FLAT[document.getElementById('pdfPtype').value] ? 'none' : 'contents';
+}
+async function pdfImgData(sku){
+  const r=await fetch(`/api/image/${sku}.jpg`);
+  const blob=await r.blob();
+  const url=URL.createObjectURL(blob);
+  try{
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;});
+    const scale=Math.min(1, 700/Math.max(img.naturalWidth,img.naturalHeight));
+    const w=Math.round(img.naturalWidth*scale), h=Math.round(img.naturalHeight*scale);
+    const c=document.createElement('canvas'); c.width=w; c.height=h;
+    const x=c.getContext('2d'); x.drawImage(img,0,0,w,h);
+    // sample bottom-right corner luminance -> pick readable ink
+    let ink='#111';
+    try{
+      const d=x.getImageData(Math.round(w*0.72),Math.round(h*0.88),Math.max(1,Math.round(w*0.26)),Math.max(1,Math.round(h*0.10))).data;
+      let lum=0,n=0; for(let i=0;i<d.length;i+=16){ lum+=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; n++; }
+      if(n && (lum/n)<128) ink='#fff';
+    }catch(e){}
+    const fs=Math.max(11, Math.round(w*0.028));
+    x.font='700 '+fs+'px Arial'; x.textAlign='right'; x.textBaseline='bottom'; x.fillStyle=ink;
+    x.fillText(sku, w-Math.round(fs*0.6), h-Math.round(fs*0.45));
+    return c.toDataURL('image/jpeg',0.82);
+  } finally { URL.revokeObjectURL(url); }
+}
+
+
+/* ===== Compact layout engine: landscape 2/page stacked, portrait & square 4/page (2x2), panoramic 3/page — all centered as a block ===== */
+const RLBL={1:"Landscape · 2:3",2:"Landscape · 3:4",3:"Landscape · 1:2 Panoramic",4:"Portrait · 2:3",5:"Portrait · 3:4",6:"Portrait · 1:2",7:"Square · 1:1",8:"Special"};
+
+/* dominant-colour analysis: histogram of saturated pixels -> strongest hue family wins; neutrals grouped last by lightness */
+function _hueKeyFromImg(im){
+  try{
+    const N=48;
+    const c=document.createElement('canvas'); c.width=c.height=N;
+    const x=c.getContext('2d'); x.drawImage(im,0,0,N,N);
+    const d=x.getImageData(0,0,N,N).data;
+    const bins=new Array(12).fill(0), binL=new Array(12).fill(0);
+    let chrom=0, tot=0, sumL=0;
+    for(let i=0;i<d.length;i+=4){
+      const R=d[i]/255,G=d[i+1]/255,B=d[i+2]/255;
+      const mx=Math.max(R,G,B),mn=Math.min(R,G,B),l=(mx+mn)/2,df=mx-mn;
+      tot++; sumL+=l;
+      if(df<0.0001) continue;
+      const s=df/(1-Math.abs(2*l-1));
+      if(s<=0.2||l<=0.12||l>=0.9) continue;          // ignore washed-out & near-black pixels
+      let h; if(mx===R)h=((G-B)/df+6)%6; else if(mx===G)h=(B-R)/df+2; else h=(R-G)/df+4;
+      const bin=Math.floor(h*60/30)%12;
+      bins[bin]+=s; binL[bin]+=l*s; chrom++;
+    }
+    if(chrom < tot*0.12) return 100000+Math.round((sumL/tot)*100);   // genuinely neutral artwork
+    let best=0; for(let k=1;k<12;k++) if(bins[k]>bins[best]) best=k;
+    const L=binL[best]/bins[best];
+    return best*1000+Math.round(L*100);
+  }catch(e){ return 999999; }
+}
+function colorKey(dataURL){
+  return new Promise(res=>{
+    const im=new Image();
+    im.onload=()=>res(_hueKeyFromImg(im));
+    im.onerror=()=>res(999999);
+    im.src=dataURL;
+  });
+}
+async function buildCatalogPdf(recs, titleLine, imgFn, progress, sortMode){
+  const { jsPDF } = window.jspdf;
+  const pdf=new jsPDF({unit:'pt',format:'a4'});
+  const PW=595,PH=842,M=42,GAP=24,CAP=24,SP=22,RG=16;
+  const HEAD_BOT=M+76, FOOT_TOP=PH-46, contentH=FOOT_TOP-HEAD_BOT;
+  const today=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  let pageNo=0;
+  function newPage(label){
+    if(pageNo>0) pdf.addPage();
+    pageNo++;
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(15);
+    pdf.text('DESIGN CATALOG', M, M+6);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(130);
+    pdf.text('Updated as on '+today, PW-M, M+6, {align:'right'});
+    pdf.setDrawColor(205); pdf.line(M, M+16, PW-M, M+16);
+    pdf.setTextColor(0);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(11.5);
+    pdf.text(titleLine, PW/2, M+40, {align:'center'});
+    pdf.setFontSize(8); pdf.setTextColor(169,130,47);
+    pdf.text(label.toUpperCase(), PW/2, M+58, {align:'center'});
+    pdf.setTextColor(0);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(150);
+    pdf.text('Page '+pageNo, PW/2, PH-24, {align:'center'});
+    pdf.setTextColor(0);
+  }
+  function drawOne(img,w,h,x,y,sku){
+    pdf.addImage(img,'JPEG',x,y,w,h);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9);
+    pdf.text(sku, x+w/2, y+h+15, {align:'center'});
+  }
+  let done=0, total=recs.length*(sortMode==='color'?2:1);
+  if(sortMode==='color'){
+    const cache={};
+    for(const r of recs){
+      cache[r.sku]=await imgFn(r.sku);
+      r._ck=await colorKey(cache[r.sku]);
+      progress(++done,total);
+    }
+    recs=recs.slice().sort((a,b)=>(a._ck-b._ck)||a.sku.localeCompare(b.sku));
+    imgFn=async sku=>cache[sku];
+  }
+  async function stackPages(items,label,perPage){
+    for(let i=0;i<items.length;i+=perPage){
+      newPage(label);
+      const grp=items.slice(i,i+perPage);
+      const maxEach=(contentH-grp.length*CAP-(grp.length-1)*SP-6)/grp.length;
+      const sizes=grp.map(r=>{const ratio=r.w/r.h;let w=PW-2*M,h=w/ratio;if(h>maxEach){h=maxEach;w=h*ratio;}return{w,h};});
+      const blockH=sizes.reduce((s,z)=>s+z.h+CAP,0)+(grp.length-1)*SP;
+      let y=HEAD_BOT+(contentH-blockH)/2;
+      for(let k=0;k<grp.length;k++){
+        drawOne(await imgFn(grp[k].sku),sizes[k].w,sizes[k].h,(PW-sizes[k].w)/2,y,grp[k].sku);
+        y+=sizes[k].h+CAP+SP;
+        progress(++done,total);
+      }
+    }
+  }
+  async function gridPages(items,label){
+    const slotW=(PW-2*M-GAP)/2;
+    for(let i=0;i<items.length;i+=4){
+      newPage(label);
+      const grp=items.slice(i,i+4);
+      const rows=[grp.slice(0,2),grp.slice(2,4)].filter(r=>r.length);
+      const maxRowH=(contentH-rows.length*CAP-(rows.length-1)*RG-6)/rows.length;
+      const rowData=rows.map(row=>{
+        const sizes=row.map(r=>{const ratio=r.w/r.h;let w=slotW,h=w/ratio;if(h>maxRowH){h=maxRowH;w=h*ratio;}return{w,h};});
+        return {row,sizes,h:Math.max(...sizes.map(z=>z.h))};
+      });
+      const blockH=rowData.reduce((s,rd)=>s+rd.h+CAP,0)+(rowData.length-1)*RG;
+      let y=HEAD_BOT+(contentH-blockH)/2;
+      for(const rd of rowData){
+        if(rd.row.length===1){
+          const z=rd.sizes[0];
+          drawOne(await imgFn(rd.row[0].sku),z.w,z.h,(PW-z.w)/2,y+(rd.h-z.h)/2,rd.row[0].sku);
+          progress(++done,total);
+        } else {
+          const cx=[M+slotW/2, M+slotW+GAP+slotW/2];
+          for(let k=0;k<2;k++){
+            const z=rd.sizes[k];
+            drawOne(await imgFn(rd.row[k].sku),z.w,z.h,cx[k]-z.w/2,y+(rd.h-z.h)/2,rd.row[k].sku);
+            progress(++done,total);
+          }
+        }
+        y+=rd.h+CAP+RG;
+      }
+    }
+  }
+  const groups={};
+  recs.forEach(r=>{(groups[r.bucket]=groups[r.bucket]||[]).push(r);});
+  for(const b of [1,2,3,4,5,6,7,8]){
+    const items=groups[b]; if(!items||!items.length) continue;
+    const label=RLBL[b]||'Designs';
+    if(b===1||b===2||b===8) await stackPages(items,label,2);
+    else if(b===3) await stackPages(items,label,3);
+    else await gridPages(items,label);
+  }
+  return pdf;
+}
+
+async function adminPdf(){
+  const plog=document.getElementById('pdfLog');
+  const pt=document.getElementById('pdfPtype').value;
+  const code=FLAT[pt]||pdfSelEl.value;
+  const res=await fetch('/api/catalog?all=1',{headers:{'x-admin-key':KEY}}); const data=await res.json();
+  const recs=(data.designs||[]).filter(d=>d.ptype===pt&&d.code===code).sort((a,b)=>a.sku.localeCompare(b.sku));
+  if(!recs.length){ plog.textContent='No designs in this selection yet.'; return; }
+  const mode=document.getElementById('pdfOrder').value;
+  const pdf=await buildCatalogPdf(recs, PT_NAME[pt]+(FLAT[pt]?'':' — '+NAME_BY_CODE[code]), pdfImgData,
+    (d,t)=>{plog.textContent=(mode==='color'&&d<=recs.length?'Analysing colours… ':'Building… ')+d+'/'+t;}, mode);
+  const fname='catalog-'+(FLAT[pt]?pt:pt+'-'+code)+(mode==='color'?'-colour':'')+'-'+new Date().toISOString().slice(0,10)+'.pdf';
+  pdf.save(fname);
+  plog.textContent='Done — '+fname;
+}
+
+/* ================= colour backfill ================= */
+async function backfillCk(){
+  const blog=document.getElementById('bkLog');
+  blog.textContent='Checking which designs need colour analysis…';
+  const res=await fetch('/api/catalog?all=1',{headers:{'x-admin-key':KEY}});
+  const data=await res.json();
+  const todo=(data.designs||[]).filter(d=>d.ck==null);
+  if(!todo.length){ blog.textContent='All designs already have colour data.'; return; }
+  let done=0;
+  for(const d of todo){
+    blog.textContent=`Analysing colours… ${done+1}/${todo.length}`;
+    try{
+      const ck = await new Promise(resolve=>{
+        const im=new Image();
+        im.onload=()=>resolve(colorKeyFromImg(im));
+        im.onerror=()=>resolve(null);
+        im.src='/api/image/'+d.sku+'.jpg';
+      });
+      if(ck!=null) await fetch('/api/setck',{method:'POST',
+        headers:{'Content-Type':'application/json','x-admin-key':KEY},
+        body:JSON.stringify({sku:d.sku, ck})});
+    }catch(e){}
+    done++;
+  }
+  blog.textContent='Colour analysis complete — '+done+' design(s) updated. The catalog view toggle now covers everything.';
+  refreshTotal();
+}
+
+/* ================= print masters ZIP ================= */
+const origSelEl = document.getElementById('origSelect');
+STRUCTURE.forEach(([group,items])=>{
+  const og=document.createElement('optgroup'); og.label=group;
+  items.forEach(([code,name])=>{ const o=document.createElement('option'); o.value=code; o.textContent=`${name} (${code})`; og.appendChild(o); });
+  origSelEl.appendChild(og);
+});
+let dlMark=null;
+function dlModeVal(){ return (document.querySelector('input[name="dlMode"]:checked')||{}).value||'since'; }
+function dlNice(d){ return new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+async function dlRecs(){
+  const pt=document.getElementById('origPtype').value;
+  const code=FLAT[pt]||origSelEl.value;
+  const res=await fetch('/api/catalog?all=1',{headers:{'x-admin-key':KEY}});
+  const data=await res.json();
+  let recs=(data.designs||[]).filter(d=>d.ptype===pt&&d.code===code).sort((a,b)=>a.sku.localeCompare(b.sku));
+  const mode=dlModeVal();
+  if(mode==='since' && dlMark) recs=recs.filter(d=>(d.added||'')>=dlMark);
+  if(mode==='from'){
+    const fd=document.getElementById('dlFromDate').value;
+    if(fd) recs=recs.filter(d=>(d.added||'')>=fd);
+  }
+  return recs;
+}
+async function refreshDlPreview(){
+  const pv=document.getElementById('dlPreview');
+  pv.textContent='Checking…';
+  try{
+    const recs=await dlRecs();
+    pv.textContent = recs.length
+      ? `→ This choice will download ${recs.length} design(s): ${recs[0].sku}${recs.length>1?' … '+recs[recs.length-1].sku:''}`
+      : '→ Nothing matches this choice — everything here is already covered.';
+  }catch(e){ pv.textContent=''; }
+}
+async function refreshDlMark(){
+  const pt=document.getElementById('origPtype').value;
+  const code=FLAT[pt]||origSelEl.value;
+  const note=document.getElementById('dlMarkNote');
+  note.textContent='…';
+  try{
+    const r=await fetch(`/api/dlmark?ptype=${pt}&code=${code}`,{headers:{'x-admin-key':KEY}});
+    dlMark=(await r.json()).last_dl||null;
+    note.textContent = dlMark
+      ? '⬇ This collection was last downloaded on '+dlNice(dlMark)+'.'
+      : '⬇ This collection has never been bulk-downloaded.';
+  }catch(e){ note.textContent=''; dlMark=null; }
+  refreshDlPreview();
+}
+document.getElementById('origPtype').addEventListener('change',e=>{
+  origSelEl.style.display = FLAT[e.target.value] ? 'none':'inline-block';
+  refreshDlMark();
+});
+origSelEl.addEventListener('change', refreshDlMark);
+document.querySelectorAll('input[name="dlMode"]').forEach(r=>r.addEventListener('change',refreshDlPreview));
+document.getElementById('dlFromDate').addEventListener('change',()=>{
+  document.querySelector('input[name="dlMode"][value="from"]').checked=true;
+  refreshDlPreview();
+});
+refreshDlMark();
+async function originalsZip(){
+  const blog=document.getElementById('bkLog');
+  const pt=document.getElementById('origPtype').value;
+  const code=FLAT[pt]||origSelEl.value;
+  blog.textContent='Collecting design list…';
+  const res=await fetch('/api/catalog?all=1',{headers:{'x-admin-key':KEY}});
+  const data=await res.json();
+  const mode=dlModeVal();
+  if(mode==='from' && !document.getElementById('dlFromDate').value){
+    blog.textContent='Pick a date first for "From a date I choose".'; return;
+  }
+  const recs=await dlRecs();
+  if(!recs.length){ blog.textContent='Nothing matches this choice — no download needed.'; return; }
+  const zip=new JSZip(); let got=0, missing=[];
+  for(let i=0;i<recs.length;i++){
+    blog.textContent=`Fetching print masters… ${i+1}/${recs.length}`;
+    try{
+      const r=await fetch('/api/original/'+recs[i].sku,{headers:{'x-admin-key':KEY}});
+      if(!r.ok){ missing.push(recs[i].sku); continue; }
+      const cd=r.headers.get('Content-Disposition')||'';
+      const fname=(cd.match(/filename="([^"]+)"/)||[])[1]||recs[i].sku+'.jpg';
+      zip.file(fname, await r.blob()); got++;
+    }catch(e){ missing.push(recs[i].sku); }
+  }
+  blog.textContent='Packing ZIP… (large collections take a minute)';
+  const blob=await zip.generateAsync({type:'blob'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='print-masters-'+(FLAT[pt]?pt:pt+'-'+code)+'-'+new Date().toISOString().slice(0,10)+'.zip';
+  a.click(); URL.revokeObjectURL(a.href);
+  const today=new Date().toISOString().slice(0,10);
+  try{
+    await fetch('/api/dlmark',{method:'POST',
+      headers:{'Content-Type':'application/json','x-admin-key':KEY},
+      body:JSON.stringify({ptype:pt,code,date:today})});
+  }catch(e){}
+  refreshDlMark();
+  const how = mode==='full' ? 'complete collection'
+    : mode==='from' ? 'added on/after '+document.getElementById('dlFromDate').value
+    : dlMark ? 'new since last download' : 'complete collection (first download)';
+  blog.textContent=`Print masters downloaded — ${got} file(s) (${how})`+(missing.length?`; ${missing.length} had no stored master: ${missing.slice(0,5).join(', ')}${missing.length>5?'…':''}`:'')+'.';
+}
+
+/* ================= full backup ================= */
+async function fullBackup(){
+  const blog=document.getElementById('bkLog');
+  blog.textContent='Collecting catalog data…';
+  const res=await fetch('/api/catalog');
+  const data=await res.json();
+  const recs=data.designs||[];
+  const zip=new JSZip();
+  zip.file('catalog-data.json', JSON.stringify(data,null,1));
+  const folder=zip.folder('images');
+  for(let i=0;i<recs.length;i++){
+    blog.textContent=`Downloading images… ${i+1}/${recs.length}`;
+    try{
+      const r=await fetch(`/api/image/${recs[i].sku}.jpg`);
+      folder.file(recs[i].sku+'.jpg', await r.blob());
+    }catch(e){}
+  }
+  blog.textContent='Packing ZIP…';
+  const blob=await zip.generateAsync({type:'blob'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='catalog-full-backup-'+new Date().toISOString().slice(0,10)+'.zip';
+  a.click();
+  blog.textContent='Backup downloaded — '+recs.length+' designs. Store it safely; repeat monthly.';
+}
+
+/* ================= customers ================= */
+let CUSTOMERS=[];
+function custMark(){ return parseInt(localStorage.getItem('custExportMark')||'0',10); }
+async function refreshCustCount(){
+  try{
+    const r=await fetch('/api/customers',{headers:{'x-admin-key':KEY}});
+    if(!r.ok) return;
+    const list=(await r.json()).customers||[];
+    const fresh=list.filter(c=>c.id>custMark()).length;
+    document.getElementById('custCount').textContent =
+      list.length + ' registered' + (fresh ? ' · '+fresh+' NEW since last CSV export' : '');
+  }catch(e){}
+}
+async function loadCustomers(){
+  const list=document.getElementById('custList'), cnt=document.getElementById('custCount');
+  list.innerHTML='Loading\u2026';
+  try{
+    const r=await fetch('/api/customers',{headers:{'x-admin-key':KEY}});
+    if(!r.ok){ list.innerHTML='<span style="color:#a03123">Could not load. Check login.</span>'; return; }
+    CUSTOMERS=(await r.json()).customers||[];
+    const freshN=CUSTOMERS.filter(c=>c.id>custMark()).length;
+    cnt.textContent=CUSTOMERS.length+' registered'+(freshN?' · '+freshN+' NEW since last CSV export':'');
+    document.getElementById('custCsvBtn').disabled=!CUSTOMERS.length;
+    if(!CUSTOMERS.length){ list.innerHTML='<span class="note">No registrations yet.</span>'; return; }
+    const mark=custMark(), esc=v=>String(v??'').replace(/</g,'&lt;');
+    list.innerHTML='<table style="border-collapse:collapse;width:100%;font-size:13px">'+
+      '<tr>'+['#','Name','Company','Phone','Email','Registered',''].map(h=>'<th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--line,#ddd)">'+h+'</th>').join('')+'</tr>'+
+      CUSTOMERS.map(c=>'<tr>'+
+        '<td style="padding:6px 10px;border-bottom:1px solid var(--line,#eee)">'+c.id+
+          (c.id>mark?' <span style="background:#a9822f;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;vertical-align:1px">NEW</span>':'')+'</td>'+
+        [c.name,c.company,c.phone,c.email,(c.created||'').slice(0,10)]
+          .map(v=>'<td style="padding:6px 10px;border-bottom:1px solid var(--line,#eee)">'+esc(v)+'</td>').join('')+
+        '<td style="padding:6px 10px;border-bottom:1px solid var(--line,#eee)"><button class="btn ghost" style="font-size:11px;padding:4px 8px" onclick="resetCustPass('+c.id+',\''+esc(c.name).replace(/'/g,'')+'\')">Reset password</button></td>'+
+      '</tr>').join('')+'</table>';
+  }catch(e){ list.innerHTML='<span style="color:#a03123">Network error.</span>'; }
+}
+function exportCustomers(){
+  if(!CUSTOMERS.length) return;
+  const esc=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const rows=[['ID','Name','Company','Phone','Email','Registered']]
+    .concat(CUSTOMERS.map(c=>[c.id,c.name,c.company,c.phone,c.email,c.created]));
+  const csv='\ufeff'+rows.map(r=>r.map(esc).join(',')).join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='catalog-customers-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  const maxId=Math.max(...CUSTOMERS.map(c=>c.id));
+  localStorage.setItem('custExportMark', String(maxId));
+  loadCustomers();
+}
+async function resetCustPass(id, name){
+  const pw=prompt('New password for '+name+' (they will be logged out everywhere and must login with this):');
+  if(pw===null) return;
+  if(!pw){ alert('Password cannot be empty.'); return; }
+  const r=await fetch('/api/customers',{method:'POST',
+    headers:{'x-admin-key':KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({action:'resetpass', id, password:pw})});
+  alert(r.ok ? 'Done. Share the new password with '+name+' on WhatsApp.' : 'Failed — please try again.');
+}
+
+</script>
+</body>
+</html>
